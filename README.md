@@ -12,10 +12,11 @@ cynober_studio/
 ├── substrate/              # pure-Python thermal atom store (vendored kernel)
 ├── engine/
 │   └── starlink_atoms.py   # TLE → atoms → density → heatmap/HTML
+├── ui/                     # Studio HTTP + 2D canvas
+│   ├── app.py
+│   ├── templates/
+│   └── static/
 ├── docs/
-│   ├── CYNOBER_STUDIO_PLAN.md
-│   ├── CYNOBER_STUDIO_AUDIT.md
-│   └── STARLINK_ATOMS.md
 ├── out/                    # caches, PNG, HTML (gitignored)
 └── tests/
 ```
@@ -29,7 +30,24 @@ python main.py --offline-demo --limit 40 --hot-only
 python main.py --limit 400 --prop sgp4 --hot-only --html
 ```
 
-## Tests & bench (Faza 0–1)
+## Studio UI (Faza 2)
+
+```bat
+python main.py --offline-demo --limit 40 --studio --open-browser
+:: http://127.0.0.1:8765/
+```
+
+| Endpoint | Opis |
+|----------|------|
+| `GET /` | 2D heatmap + filtry |
+| `GET /api/version` | `{version}` |
+| `GET /api/data` | `snapshot()` + nlat/nlon |
+| `GET /api/filter?shell=&min_count=` | S4b |
+| `POST /api/refresh` | `{minutes, reload_tle}` |
+
+stdlib only (no Flask).
+
+## Tests & bench (Faza 0–2)
 
 ```bat
 python -m unittest discover -s tests -v

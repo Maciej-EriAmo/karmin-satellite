@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Cynober Studio</title>
+  <link rel="stylesheet" href="/static/studio.css"/>
+</head>
+<body>
+  <header>
+    <div>
+      <h1><span>Cynober</span> Studio</h1>
+      <div class="sub">thermal atoms · Starlink density · S2a heatmap</div>
+    </div>
+    <div>
+      <span class="badge" id="badge-status">boot</span>
+      <span class="badge">v<span id="stat-version">0</span></span>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <h2>Stats</h2>
+      <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
+      <div class="stat"><span>Cells</span><b id="stat-cells">—</b></div>
+      <div class="stat"><span>Hot cells</span><b id="stat-hot">—</b></div>
+      <div class="stat"><span>Prop ms</span><b id="stat-prop">—</b></div>
+      <div class="stat"><span>Prop errors</span><b id="stat-errors">—</b></div>
+      <div class="stat"><span>Using</span><b id="stat-using">—</b></div>
+      <div class="stat"><span>TLE</span><b id="stat-src" style="font-size:.72rem;max-width:55%;text-align:right;word-break:break-all">—</b></div>
+
+      <h2 style="margin-top:1.2rem">Filter (S4b)</h2>
+      <fieldset>
+        <legend>Shell</legend>
+        <div id="shell-radios">
+          <label class="row"><input type="radio" name="shell" value="all" checked/> All</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Min count · <span id="min-count-val">1</span></legend>
+        <input type="range" id="min-count" min="1" max="20" value="1"/>
+      </fieldset>
+      <div class="sub" id="filter-info">all · min≥1</div>
+      <div class="btns">
+        <button class="primary" id="btn-refresh" type="button">Refresh</button>
+        <button id="btn-reset" type="button">Reset filter</button>
+      </div>
+      <div class="error" id="err"></div>
+
+      <h2 style="margin-top:1.2rem">Shells</h2>
+      <div id="shell-list"></div>
+    </aside>
+
+    <section class="panel">
+      <h2>Density map (2D)</h2>
+      <div class="viz-wrap">
+        <canvas id="heatmap" width="720" height="360"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+      <p class="sub" style="margin:.75rem 0 0">
+        Hover cell · filter by shell / min count · poll <code>/api/version</code> every 5s.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    Cynober Studio · substrate pure-Python · engine Starlink atoms · private product
+  </footer>
+  <script src="/static/heatmap.js"></script>
+</body>
+</html>

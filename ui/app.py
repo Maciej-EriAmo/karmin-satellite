@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""
+Cynober Studio HTTP server (stdlib only).
+
+  GET  /              → 2D heatmap UI
+  GET  /static/*      → css/js
+  GET  /api/version   → {version}
+  GET  /api/data      → snapshot() + meta
+  GET  /api/filter    → filter_density(shell, min_count)
+  POST /api/refresh   → refresh catalog (optional minutes)
+  GET  /api/summary   → summary()
+"""
+from __future__ import annotations
+
+import json
+import mimetypes
+import sys
+import threading
+import traceback
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, List, Optional, Sequence, Tuple
+from urllib.parse import parse_qs, urlparse
+
+ROOT = Path(__file__).resolve().parents[1]
+UI_DIR = Path(__file__).resolve().parent
+STATIC_DIR = UI_DIR / "static"
+TEMPLATE_DIR = UI_DIR / "templates"
+
+_SUB = ROOT / "substrate"
+if str(_SUB) not in sys.path:
+    sys.path.insert(0, str(_SUB))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+
+@dataclass
+class StudioState:
+    """Shared runtime for HTTP handlers (thread-safe via amap locks)."""
+
+    amap: Any
+    catalog: List[Any]
+    src: str = ""
+    using: int = 0
+    offline_demo: bool = False
+    cache: str = "out/starlink_tle_cache.txt"
+    meta: dict = field(default_factory=dict)
+    lock: threading.RLock = field(default_factory=threading.RLock)
+
+    def refresh_catalog(self, *, minutes: float = 0.0, reload_tle: bool = False) -> dict:
+        """Refresh positions; optionally re-fetch TLE text."""
+        with self.lock:
+            if reload_tle and not self.offline_demo:
+                from engine.starlink_atoms import load_tle_text, parse_tle_catalog
+
+                raw, src = load_tle_text(
+                    offline_demo=False,
+                    cache=Path(self.cache),
+                    limit_hint=self.using or 12,
+                )
+                catalog = parse_tle_catalog(raw)
+                if self.using and self.using < len(catalog):
+                    # keep original limit if set via using
+                    limit = self.using
+                    catalog = catalog[:limit]
+                self.catalog = catalog
+                self.src = src
+                self.using = len(catalog)
+            info = self.amap.refresh(self.catalog, minutes=minutes, ensure=True)
+            info["src"] = self.src
+            info["using"] = self.using
+            return info
+
+
+def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict) -> None:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    handler.send_response(code)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
+    length = int(handler.headers.get("Content-Length") or 0)
+    if length <= 0:
+        return {}
+    raw = handler.rfile.read(length)
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def create_handler(state: StudioState):
+    class StudioHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt: str, *args) -> None:
+            # quieter default; still useful
+            sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+        def do_GET(self) -> None:  # noqa: N802
+            try:
+                self._dispatch_get()
+            except Exception as e:
+                traceback.print_exc()
+                _json_response(
+                    self,
+                    500,
+                    {"status": "error", "message": str(e), "data": None},
+                )
+
+        def do_POST(self) -> None:  # noqa: N802
+            try:
+                self._dispatch_post()
+            except Exception as e:
+                traceback.print_exc()
+                _json_response(
+                    self,
+                    500,
+                    {"status": "error", "message": str(e), "data": None},
+                )
+
+        def _dispatch_get(self) -> None:
+            parsed = urlparse(self.path)
+            path = parsed.path or "/"
+            qs = parse_qs(parsed.query)
+
+            if path == "/" or path == "/index.html":
+                self._serve_index()
+                return
+            if path.startswith("/static/"):
+                self._serve_static(path[len("/static/") :])
+                return
+            if path == "/api/version":
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "version": state.amap.get_export_version(),
+                    },
+                )
+                return
+            if path == "/api/summary":
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": state.amap.summary(),
+                        "src": state.src,
+                        "using": state.using,
+                    },
+                )
+                return
+            if path == "/api/data":
+                snap = state.amap.snapshot()
+                # enrich for 2D canvas (nlat/nlon)
+                deg = float(snap.get("grid_deg") or state.amap.grid_deg)
+                import math
+
+                nlat = int(math.ceil(180.0 / deg))
+                nlon = int(math.ceil(360.0 / deg))
+                payload = {
+                    "status": "ok",
+                    "data": {
+                        **snap,
+                        "nlat": nlat,
+                        "nlon": nlon,
+                        "tle_source": state.src,
+                        "using": state.using,
+                        "project": "Cynober Studio",
+                    },
+                }
+                _json_response(self, 200, payload)
+                return
+            if path == "/api/filter":
+                shell = (qs.get("shell") or ["all"])[0]
+                try:
+                    min_count = int((qs.get("min_count") or ["1"])[0])
+                except ValueError:
+                    min_count = 1
+                filtered = state.amap.filter_density(
+                    shell=shell, min_count=min_count
+                )
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": filtered},
+                )
+                return
+            if path == "/api/health":
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "service": "cynober-studio",
+                        "version": state.amap.get_export_version(),
+                    },
+                )
+                return
+
+            _json_response(self, 404, {"status": "error", "message": "not found"})
+
+        def _dispatch_post(self) -> None:
+            parsed = urlparse(self.path)
+            path = parsed.path or "/"
+            if path == "/api/refresh":
+                body = _read_json_body(self)
+                minutes = float(body.get("minutes") or 0.0)
+                reload_tle = bool(body.get("reload_tle") or False)
+                info = state.refresh_catalog(
+                    minutes=minutes, reload_tle=reload_tle
+                )
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": info},
+                )
+                return
+            _json_response(self, 404, {"status": "error", "message": "not found"})
+
+        def _serve_index(self) -> None:
+            path = TEMPLATE_DIR / "index.html"
+            if not path.is_file():
+                _json_response(
+                    self, 500, {"status": "error", "message": "index.html missing"}
+                )
+                return
+            data = path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _serve_static(self, rel: str) -> None:
+            # prevent path escape
+            rel = rel.replace("\\", "/").lstrip("/")
+            if ".." in rel.split("/"):
+                _json_response(self, 403, {"status": "error", "message": "forbidden"})
+                return
+            path = (STATIC_DIR / rel).resolve()
+            if not str(path).startswith(str(STATIC_DIR.resolve())):
+                _json_response(self, 403, {"status": "error", "message": "forbidden"})
+                return
+            if not path.is_file():
+                _json_response(self, 404, {"status": "error", "message": "not found"})
+                return
+            data = path.read_bytes()
+            ctype = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+    return StudioHandler
+
+
+def run_studio(
+    state: StudioState,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    open_browser: bool = False,
+) -> int:
+    """Blocking studio server. Returns 0 on clean KeyboardInterrupt."""
+    handler = create_handler(state)
+    httpd = ThreadingHTTPServer((host, port), handler)
+    url = f"http://{host}:{port}/"
+    print(f"Cynober Studio  {url}")
+    print(f"  TLE={state.src}  sats={state.using}  version={state.amap.version}")
+    print("  API: /api/version  /api/data  /api/filter  POST /api/refresh")
+    print("  Ctrl+C to stop")
+    if open_browser:
+        try:
+            import webbrowser
+
+            webbrowser.open(url)
+        except Exception as e:
+            print(f"open browser: {e}", file=sys.stderr)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStudio stopped.")
+    finally:
+        httpd.server_close()
+    return 0
+
+
+def build_and_run(
+    *,
+    limit: int = 400,
+    grid: float = 5.0,
+    hot_only: bool = True,
+    prop: str = "auto",
+    offline_demo: bool = False,
+    cache: str = "out/starlink_tle_cache.txt",
+    backend: str = "python",
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    open_browser: bool = False,
+) -> int:
+    from engine.starlink_atoms import build_map
+
+    store, amap, use, src = build_map(
+        limit=limit,
+        grid=grid,
+        hot_only=hot_only,
+        prop=prop,
+        offline_demo=offline_demo,
+        cache=cache,
+        backend=backend,
+    )
+    state = StudioState(
+        amap=amap,
+        catalog=list(use),
+        src=src,
+        using=len(use),
+        offline_demo=offline_demo,
+        cache=cache,
+        meta={"store": type(store).__name__},
+    )
+    return run_studio(state, host=host, port=port, open_browser=open_browser)

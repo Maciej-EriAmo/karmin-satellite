@@ -1589,7 +1589,7 @@ def build_map(
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(
-        description="Starlink → atomy Karmazyn (plan Fazy 0–3)"
+        description="Cynober Studio — Starlink thermal atoms (engine + optional UI)"
     )
     ap.add_argument("--limit", type=int, default=400, help="0 = cały katalog")
     ap.add_argument("--grid", type=float, default=5.0)
@@ -1642,6 +1642,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         action="store_true",
         help="po --html otwórz w domyślnej przeglądarce",
     )
+    ap.add_argument(
+        "--studio",
+        action="store_true",
+        help="uruchom Cynober Studio HTTP UI (2D heatmap + API)",
+    )
+    ap.add_argument("--host", type=str, default="127.0.0.1", help="Studio bind host")
+    ap.add_argument("--port", type=int, default=8765, help="Studio HTTP port")
+    ap.add_argument(
+        "--open-browser",
+        action="store_true",
+        help="po --studio otwórz przeglądarkę",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     if args.full_grid:
@@ -1691,6 +1703,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     print(f"store={summ['store']}")
     print(f"elapsed={dt:.2f}s")
+
+    if args.studio:
+        from ui.app import StudioState, run_studio
+
+        # studio mode: no PNG by default unless --heatmap path still wanted
+        state = StudioState(
+            amap=amap,
+            catalog=list(use),
+            src=src,
+            using=len(use),
+            offline_demo=bool(args.offline_demo),
+            cache=args.cache,
+        )
+        return run_studio(
+            state,
+            host=args.host,
+            port=args.port,
+            open_browser=bool(args.open_browser),
+        )
 
     heat_path: Optional[Path] = None
     if not args.no_heatmap:

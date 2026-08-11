@@ -382,29 +382,29 @@ DONE WHEN:
   ☑ unit: filter shell:53 / empty shell:99
 ```
 
-### Faza 2 — Presentation 2D jako Studio (2–3 dni)
+### Faza 2 — Presentation 2D jako Studio — **DONE 2026-08-11**
 
-**Cel:** `python main.py --studio` serwuje / lub generuje UI z live-ready API shape.
+**Cel:** `python main.py --studio` serwuje UI z live-ready API shape.
 
 ```
 PSEUDO:
 
   main --studio [--port 8765] [--limit …]:
     store, map, catalog, src ← build_map(…)
-    app ← create_app(map)
+    app ← create_app(map)   # ui/app.py ThreadingHTTPServer
 
-  GET /api/version  → {version}
-  GET /api/data     → export from snapshot()   # full
-  GET /api/filter?shell=&min_count= → filter_density
-  GET /             → templates/heatmap_2d.html (canvas + stats + shell radios)
+  ☑ GET /api/version  → {version}
+  ☑ GET /api/data     → snapshot() + nlat/nlon
+  ☑ GET /api/filter?shell=&min_count= → filter_density
+  ☑ POST /api/refresh → version++
+  ☑ GET /             → templates/index.html (canvas + shell + min_count)
+  ☑ Client poll /api/version co 5s
 
-  Client poll /api/version co 5s; przy zmianie fetch /api/data
-
-  Opcja bez serwera: zachować --html file:// (już jest)
+  Opcja bez serwera: --html file:// (nadal)
 
 DONE WHEN:
-  - browser: full catalog cache, filter shell działa, stats się zgadzają
-  - payload.version rośnie po ręcznym refresh endpoint (POST /api/refresh)
+  ☑ tests/test_studio_api.py green
+  ☑ version rośnie po POST /api/refresh
 ```
 
 ### Faza 3 — Live feeder (1–2 dni) *po* Faza 1
