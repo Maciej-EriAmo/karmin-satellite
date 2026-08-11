@@ -17,7 +17,9 @@ ensure_paths()
 from engine.build import build_map
 from engine.cli import main
 from engine.constants import (
+    ARCH_MAX_SATS,
     CELESTRAK_URLS,
+    DEFAULT_LIMIT,
     HAS_SGP4,
     MU_EARTH,
     R_EARTH,
@@ -76,6 +78,8 @@ __all__ = [
     "USER_AGENT",
     "MU_EARTH",
     "R_EARTH",
+    "ARCH_MAX_SATS",
+    "DEFAULT_LIMIT",
 ]
 
 

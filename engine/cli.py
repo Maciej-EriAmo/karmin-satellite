@@ -19,7 +19,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(
         description="Cynober Studio — Starlink thermal atoms (engine + optional UI)"
     )
-    ap.add_argument("--limit", type=int, default=400, help="0 = cały katalog")
+    ap.add_argument(
+        "--limit",
+        type=int,
+        default=400,
+        help="ile satelitów wziąć (0 = cały katalog; arch cap = 12000)",
+    )
+    ap.add_argument(
+        "--no-arch-cap",
+        action="store_true",
+        help="nie tnij do ARCH_MAX_SATS=12000 (poza budżetem architektury)",
+    )
     ap.add_argument("--grid", type=float, default=5.0)
     ap.add_argument("--minutes", type=float, default=0.0)
     ap.add_argument("--heatmap", type=str, default="out/starlink_heat.png")
@@ -182,6 +192,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 cache=args.cache,
                 backend=args.backend,
                 minutes=args.minutes,
+                arch_cap=not bool(args.no_arch_cap),
             )
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)

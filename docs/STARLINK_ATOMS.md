@@ -7,6 +7,17 @@
 
 ---
 
+## Scale (architecture)
+
+| | |
+|---|---|
+| **ARCH_MAX_SATS** | **12 000** — budżet produktu (pure-Python Store / jedna mapa) |
+| **DEFAULT_LIMIT** | **400** — wygodny dev sample w CLI |
+| **`--limit 0`** | cały TLE po parse, potem cap do 12 000 (wyłączenie: `arch_cap=False` / `--no-arch-cap`) |
+| Public Starlink (typowo) | ~10–11 k w grupie Celestrak — **mieści się w 12 k** |
+
+Planowe „50–100k” w starych notatkach to horyzont researchowy, **nie** limit v1 Studio.
+
 ## Goal
 
 Show that **one atom substrate** can multi-task a real-scale public workload without a second database *in process* (snapshots are optional persistence):

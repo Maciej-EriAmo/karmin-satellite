@@ -272,25 +272,26 @@ PSEUDO (później, po stabilnym API exportu):
 
 ---
 
-### A10. Skala 50–100k atomów
+### A10. Skala — **ARCH_MAX_SATS = 12 000**
 
 ```
-ASSUME plan: 50k–100k satów, total e2e <3–5s.
+ASSUME (kanon produktu): jedna mapa Studio ≤ 12_000 satelitów (pure-Python).
+  DEFAULT_LIMIT = 400 (dev)
+  --limit 0 → cały TLE, cap do 12k
+  public Starlink ~10–11k ⊆ 12k
 
-VERIFY (MVP mierzony w docs ~10.7k Starlink):
-  prop SGP4 full catalog ~200–240 ms (desktop, stary pomiar KarmazynOs)
+VERIFY (historycznie ~10.7k Starlink):
+  prop SGP4 full catalog ~200–240 ms
   hot cells ~2k
   e2e <0.5s z cache TLE
 
-PSEUDO bench (Faza 0 Studio — do powtórzenia w tym repo):
-  for N in [1k, 10k, full, synthetic_50k]:
-    t0; build_map(limit=N); t1
-    measure: prop_ms, cells, RSS, export_json_bytes
-  assert prop_errors_rate < 1%
-  assert hot_cells p95 < 5k (realistyczny target z audytu)
+PSEUDO bench:
+  for N in [400, 1k, 10k, 12k]:
+    build_map(limit=N); measure prop_ms, cells, RSS
+  assert len(use) <= ARCH_MAX_SATS  (gdy arch_cap)
 ```
 
-| Werdykt | **PARTIAL** — 10k potwierdzone historycznie; 50k/100k = **do zmierzenia tutaj** |
+| Werdykt | **TRUE (budżet)** · full catalog public ⊆ 12k; 50–100k = poza v1 |
 
 ---
 

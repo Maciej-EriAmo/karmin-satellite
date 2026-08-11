@@ -14,6 +14,13 @@ S_CELL = "starlink:cell"
 MU_EARTH = 398600.4418
 R_EARTH = 6378.137
 
+# Architecture budget for Studio pure-Python path (sats in one map/session).
+# Full public Starlink TLE is typically ~10–11k; design ceiling = 12_000.
+# Not a hard Store crash limit — product SoT for scale / memory planning.
+ARCH_MAX_SATS = 12_000
+# CLI default sample size (dev); 0 = entire catalog (still capped at ARCH_MAX_SATS unless forced)
+DEFAULT_LIMIT = 400
+
 try:
     from sgp4.api import Satrec, jday as sgp4_jday
 

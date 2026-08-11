@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any, List, Tuple
 
@@ -10,12 +11,14 @@ from engine.bootstrap import ensure_paths
 ensure_paths()
 from karmazyn_kernel import open_store  # noqa: E402
 
+from engine.constants import ARCH_MAX_SATS, DEFAULT_LIMIT
 from engine.map import StarlinkAtomMap
 from engine.tle import TleSat, load_tle_text, parse_tle_catalog
 
+
 def build_map(
     *,
-    limit: int = 400,
+    limit: int = DEFAULT_LIMIT,
     grid: float = 5.0,
     hot_only: bool = True,
     prop: str = "auto",
@@ -24,8 +27,15 @@ def build_map(
     backend: str = "python",
     minutes: float = 0.0,
     store: Any = None,
+    arch_cap: bool = True,
 ) -> Tuple[Any, StarlinkAtomMap, List[TleSat], str]:
-    """API do seedowania Store (boot / tool / testy)."""
+    """API do seedowania Store (boot / tool / testy).
+
+    limit:
+      0 → cały katalog TLE (po parse), potem opcjonalnie cięcie do ARCH_MAX_SATS
+      N → pierwsze N wpisów
+    arch_cap=True (domyślnie): nie bierzemy więcej niż ARCH_MAX_SATS (12_000).
+    """
     if backend and backend != "default":
         os.environ["KARMAZYN_SUBSTRATE"] = backend
     raw, src = load_tle_text(
@@ -35,6 +45,13 @@ def build_map(
     )
     catalog = parse_tle_catalog(raw)
     use = catalog if limit == 0 else catalog[:limit]
+    if arch_cap and len(use) > ARCH_MAX_SATS:
+        print(
+            f"WARN: catalog using={len(use)} > ARCH_MAX_SATS={ARCH_MAX_SATS}; "
+            f"capping (architecture budget). Pass arch_cap=False to override.",
+            file=sys.stderr,
+        )
+        use = use[:ARCH_MAX_SATS]
     if store is None:
         store = open_store(
             thermal=True,
