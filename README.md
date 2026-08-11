@@ -8,16 +8,17 @@ Standalone like **Cynober DB**: own substrate + engine. **KarmazynOs is optional
 
 ```
 cynober_studio/
-├── main.py                 # CLI entry
-├── substrate/              # pure-Python thermal atom store (vendored kernel)
-├── engine/
-│   └── starlink_atoms.py   # TLE → atoms → density → heatmap/HTML
-├── ui/                     # Studio HTTP + 2D canvas
-│   ├── app.py
-│   ├── templates/
-│   └── static/
+├── main.py
+├── substrate/              # pure-Python thermal atom store
+├── engine/                 # modular engine
+│   ├── tle.py · prop.py · grid.py · map.py
+│   ├── export_2d.py · build.py · cli.py · live_feeder.py
+│   └── starlink_atoms.py   # facade (compat)
+├── transform/
+│   └── sphere.py           # S2b 3D quads
+├── ui/                     # HTTP + 2D/3D
 ├── docs/
-├── out/                    # caches, PNG, HTML (gitignored)
+├── out/
 └── tests/
 ```
 
@@ -34,16 +35,18 @@ python main.py --limit 400 --prop sgp4 --hot-only --html
 
 ```bat
 python main.py --offline-demo --limit 40 --studio --open-browser
+python main.py --offline-demo --limit 40 --studio --studio-mode 3d --open-browser
 :: live feed (interval w sekundach; 15 min = 900)
 python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --open-browser
-:: http://127.0.0.1:8765/
+:: http://127.0.0.1:8765/  ·  ?mode=3d
 ```
 
 | Endpoint | Opis |
 |----------|------|
-| `GET /` | 2D heatmap + filtry |
+| `GET /` | UI 2D/3D + filtry |
 | `GET /api/version` | `{version}` |
 | `GET /api/data` | `snapshot()` + nlat/nlon + feeder |
+| `GET /api/sphere` | S2b sphere quads (3D) |
 | `GET /api/filter?shell=&min_count=` | S4b |
 | `POST /api/refresh` | `{minutes, reload_tle}` |
 | `GET /api/feeder` | status live feedera |

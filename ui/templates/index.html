@@ -10,17 +10,24 @@
   <header>
     <div>
       <h1><span>Cynober</span> Studio</h1>
-      <div class="sub">thermal atoms · Starlink density · S2a heatmap</div>
+      <div class="sub">thermal atoms · Starlink density · 2D / 3D</div>
     </div>
     <div>
       <span class="badge" id="badge-status">boot</span>
       <span class="badge">v<span id="stat-version">0</span></span>
+      <span class="badge" id="badge-mode">2d</span>
     </div>
   </header>
 
   <main>
     <aside class="panel">
-      <h2>Stats</h2>
+      <h2>View</h2>
+      <div class="btns">
+        <button type="button" id="btn-mode-2d" class="primary">2D heatmap</button>
+        <button type="button" id="btn-mode-3d">3D globe</button>
+      </div>
+
+      <h2 style="margin-top:1.2rem">Stats</h2>
       <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
       <div class="stat"><span>Cells</span><b id="stat-cells">—</b></div>
       <div class="stat"><span>Hot cells</span><b id="stat-hot">—</b></div>
@@ -52,7 +59,7 @@
       <div id="shell-list"></div>
     </aside>
 
-    <section class="panel">
+    <section class="panel" id="panel-heatmap">
       <h2>Density map (2D)</h2>
       <div class="viz-wrap">
         <canvas id="heatmap" width="720" height="360"></canvas>
@@ -62,11 +69,42 @@
         Hover cell · filter by shell / min count · poll <code>/api/version</code> every 5s.
       </p>
     </section>
+
+    <section class="panel" id="panel-globe" style="display:none">
+      <h2>Globe (3D) · <span id="globe-meta" class="sub">—</span></h2>
+      <div class="viz-wrap" id="globe-host" style="min-height:360px"></div>
+      <p class="sub" style="margin:.75rem 0 0">
+        Drag to rotate · scroll zoom · Three.js CDN · data from <code>/api/sphere</code>
+      </p>
+    </section>
   </main>
 
   <footer>
-    Cynober Studio · substrate pure-Python · engine Starlink atoms · private product
+    Cynober Studio · substrate pure-Python · engine modular · private product
   </footer>
   <script src="/static/heatmap.js"></script>
+  <script src="/static/globe.js"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const mode = (params.get("mode") || "2d").toLowerCase();
+      function setMode(m) {
+        const is3 = m === "3d";
+        document.getElementById("badge-mode").textContent = is3 ? "3d" : "2d";
+        document.getElementById("btn-mode-2d").classList.toggle("primary", !is3);
+        document.getElementById("btn-mode-3d").classList.toggle("primary", is3);
+        if (window.CynoberGlobe) window.CynoberGlobe.show(is3);
+        const u = new URL(location.href);
+        u.searchParams.set("mode", is3 ? "3d" : "2d");
+        history.replaceState(null, "", u);
+      }
+      document.getElementById("btn-mode-2d").onclick = () => setMode("2d");
+      document.getElementById("btn-mode-3d").onclick = () => setMode("3d");
+      if (mode === "3d") {
+        // wait for scripts
+        setTimeout(() => setMode("3d"), 0);
+      }
+    })();
+  </script>
 </body>
 </html>

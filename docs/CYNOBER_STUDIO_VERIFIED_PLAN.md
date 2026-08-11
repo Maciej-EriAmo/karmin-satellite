@@ -422,15 +422,18 @@ DONE WHEN:
   □ opcjonalny ręczny soak 30 min (ops)
 ```
 
-### Faza 4 — 3D globe opcjonalny (2–4 dni)
+### Faza 4 — 3D globe — **DONE 2026-08-11**
 
 ```
-  transform/export_sphere.py: density → quads (clamp, wrap, dateline note)
-  ui static globe.js (Three.js CDN)
-  --studio-mode 2d|3d
+  ☑ transform/sphere.py: density → quads (clamp, wrap, dateline meta)
+  ☑ ui/static/globe.js (Three.js CDN, drag/zoom)
+  ☑ GET /api/sphere
+  ☑ --studio-mode 2d|3d + UI toggle
+  ☑ monolit split: tle/prop/grid/map/export_2d/build/cli/lua_bridge
 
 DONE WHEN:
-  - 2D nadal default; 3D ładuje się bez blokowania 2D
+  ☑ 2D default; 3D on demand
+  ☑ tests/test_sphere.py
 ```
 
 ### Faza 5 — Adapter DB (S1b) (2–3 dni)

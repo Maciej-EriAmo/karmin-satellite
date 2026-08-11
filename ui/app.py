@@ -11,6 +11,7 @@ Cynober Studio HTTP server (stdlib only).
   GET  /api/summary   → summary()
   GET  /api/feeder    → live feeder status
   POST /api/feeder/stop → stop feeder
+  GET  /api/sphere    → S2b sphere quads (3D)
 """
 from __future__ import annotations
 
@@ -55,6 +56,7 @@ class StudioState:
     meta: dict = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
     feeder: Any = None  # Optional[LiveFeeder]
+    studio_mode: str = "2d"  # 2d | 3d (default UI hint)
 
     def refresh_catalog(
         self,
@@ -277,6 +279,15 @@ def create_handler(state: StudioState):
                         {"status": "ok", "data": state.feeder.status()},
                     )
                 return
+            if path == "/api/sphere":
+                from transform.sphere import export_sphere_data
+
+                data = export_sphere_data(state.amap)
+                data["tle_source"] = state.src
+                data["using"] = state.using
+                data["project"] = "Cynober Studio"
+                _json_response(self, 200, {"status": "ok", "data": data})
+                return
             if path == "/api/health":
                 _json_response(
                     self,
@@ -285,6 +296,7 @@ def create_handler(state: StudioState):
                         "status": "ok",
                         "service": "cynober-studio",
                         "version": state.amap.get_export_version(),
+                        "studio_mode": state.studio_mode,
                         "feeder": bool(
                             state.feeder is not None
                             and getattr(state.feeder, "running", False)
@@ -341,7 +353,15 @@ def create_handler(state: StudioState):
                     self, 500, {"status": "error", "message": "index.html missing"}
                 )
                 return
-            data = path.read_bytes()
+            # inject default mode from server if no ?mode= in URL (client still owns toggle)
+            text = path.read_text(encoding="utf-8")
+            if state.studio_mode == "3d" and "mode=3d" not in (self.path or ""):
+                # soft default: badge only; client URL param wins
+                text = text.replace(
+                    'const mode = (params.get("mode") || "2d")',
+                    'const mode = (params.get("mode") || "3d")',
+                )
+            data = text.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
