@@ -78,6 +78,16 @@ class LiveFeeder:
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self.stats = FeederStats()
+        # Optional SLA classification (set by Studio attach_feeder)
+        self.sla_interval: Optional[Dict[str, Any]] = None
+        try:
+            from engine.sla import evaluate_live_interval
+
+            self.sla_interval = evaluate_live_interval(self.interval_sec)
+            if self.sla_interval.get("level") in ("warn", "forbidden"):
+                log.warning("%s: %s", name, self.sla_interval.get("message_en"))
+        except Exception:
+            self.sla_interval = None
         self._atexit_registered = False
 
     @property
@@ -117,13 +127,16 @@ class LiveFeeder:
         log.info("%s stopped cycles=%d ok=%d fail=%d", self.name, self.stats.cycles, self.stats.successes, self.stats.failures)
 
     def status(self) -> dict:
-        return {
+        out = {
             "running": self.running,
             "interval_sec": self.interval_sec,
             "max_fails": self.max_fails,
             "name": self.name,
             "stats": self.stats.as_dict(),
         }
+        if self.sla_interval is not None:
+            out["sla"] = dict(self.sla_interval)
+        return out
 
     def _loop(self) -> None:
         fail_streak = 0

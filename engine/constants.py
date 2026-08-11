@@ -15,9 +15,10 @@ MU_EARTH = 398600.4418
 R_EARTH = 6378.137
 
 # ── Scale architecture (pure-Python Studio path) ────────────────────────────
-# Kanon: docs/ARCHITECTURE_LIMITS.md  ·  baseline: docs/capacity_baseline.json
+# Kanon skali: docs/ARCHITECTURE_LIMITS.md  ·  baseline: docs/capacity_baseline.json
+# Kontrakt SLA 50k: engine/sla.py · docs/SLA_50K.md · GET /api/sla
 # Measured 2026-08-11: 50k ~5.7s e2e, 100k ~11.6s e2e, 0 prop errors (SGP4 hot-only).
-ARCH_USABLE_SATS = 50_000  # recommended operating budget (design target)
+ARCH_USABLE_SATS = 50_000  # recommended operating budget (design target = SLA)
 ARCH_CEILING_SATS = 100_000  # hard max per map/session (build_map arch_cap)
 # Back-compat alias (= ceiling). Do not reintroduce 12k.
 ARCH_MAX_SATS = ARCH_CEILING_SATS
@@ -25,6 +26,7 @@ ARCH_MAX_SATS = ARCH_CEILING_SATS
 # CLI default sample size (dev only — NOT product max).
 # 0 = entire catalog (capped at ceiling if arch_cap).
 DEFAULT_LIMIT = 400
+# Full SLA budgets: from engine.sla import … / docs/SLA_50K.md
 
 try:
     from sgp4.api import Satrec, jday as sgp4_jday

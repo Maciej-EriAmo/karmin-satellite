@@ -6,6 +6,7 @@ Standalone like **Cynober DB**: own substrate + engine. **KarmazynOs is optional
 
 **Architecture scale (measured):** **50 000** usable · **100 000** ceiling.  
 Canon: [`docs/ARCHITECTURE_LIMITS.md`](docs/ARCHITECTURE_LIMITS.md) · baseline JSON: [`docs/capacity_baseline.json`](docs/capacity_baseline.json).  
+**50k SLA (design contract, PL+EN):** [`docs/SLA_50K.md`](docs/SLA_50K.md) · code `engine/sla.py` · `GET /api/sla`.  
 CLI default sample **400**. Re-run: `python tests\test_capacity.py` (add `CYNOBER_CAPACITY_CEILING=1` for 100k).
 
 ## Layout
@@ -48,8 +49,9 @@ python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --op
 | Endpoint | Opis |
 |----------|------|
 | `GET /` | UI 2D/3D + filtry |
-| `GET /api/version` | `{version}` |
-| `GET /api/data` | `snapshot()` + nlat/nlon + feeder |
+| `GET /api/version` | `{version, sla_version, design_sats}` |
+| `GET /api/sla` | kontrakt SLA 50k (machine-readable) |
+| `GET /api/data` | `snapshot()` + nlat/nlon + feeder (cells-scale) |
 | `GET /api/sphere` | S2b sphere quads (3D) |
 | `GET /api/filter?shell=&min_count=` | S4b |
 | `POST /api/refresh` | `{minutes, reload_tle}` |

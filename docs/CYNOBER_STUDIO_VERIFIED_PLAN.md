@@ -448,7 +448,10 @@ DONE WHEN:
 
 | Item | Priorytet | Notatka |
 |------|-----------|---------|
+| **TOR A — design against 50k SLA** | **DONE 2026-08-11** | `docs/SLA_50K.md` · `engine/sla.py` · `/api/sla` · capacity hard gates |
 | Most RPC → żywy Cynober DB / światy | MED | lokalne snapshoty już są |
+| Narzędzia analityczne (analytics) | later | po SLA / nie blokuja toru A |
+| Pełniejszy EN w UI | later | SLA docs już PL+EN |
 | Soak 30 min live-feed (ops) | LOW | unit feeder OK |
 | Delta JSON / ETag | LOW | version poll wystarcza na MVP |
 | Edit atoms (S4c) | — | out of scope |

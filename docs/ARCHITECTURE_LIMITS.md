@@ -5,7 +5,8 @@
 **Źródło kodu:** `engine/constants.py` · `tests/test_capacity.py`  
 **Surowy raport:** `out/capacity_report.json` (gitignore) · kopia bazowa: `docs/capacity_baseline.json`
 
-> **To jest pierwszy kanon skali produktu.** Wszystkie decyzje UI/API/DB opierają się na tych liczbach.
+> **To jest pierwszy kanon skali produktu.** Wszystkie decyzje UI/API/DB opierają się na tych liczbach.  
+> **SLA produktowe (target vs hard, live, API):** [`docs/SLA_50K.md`](SLA_50K.md) · kod: `engine/sla.py` · `GET /api/sla`.
 
 ---
 
@@ -159,7 +160,7 @@ python tests\test_capacity.py
 :: porównaj prop_ms i peak_mb @10k i @50k z docs/capacity_baseline.json
 ```
 
-Jeśli @50k: `prop_errors>0` **lub** `elapsed_s>30` **lub** `peak_tracemalloc_mb>1024` → **blokuj merge**.
+Jeśli @50k: `prop_errors>0` **lub** `elapsed_s>=30` **lub** `peak_tracemalloc_mb>=1024` **lub** export ≥500 KB **lub** consistency fail → **blokuj merge** (patrz hard SLA w `engine/sla.py`).
 
 ---
 

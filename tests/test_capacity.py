@@ -142,14 +142,11 @@ def run_capacity_suite() -> dict:
     }
 
     if usable_row is not None:
-        # Soft acceptance for usable 50k (not lab perfection)
-        ok = (
-            usable_row["sats"] == ARCH_USABLE_SATS
-            and usable_row["prop_errors"] == 0
-            and usable_row["consistency_ok"]
-            and usable_row["elapsed_s"] < 120.0  # generous wall clock
-            and usable_row["peak_tracemalloc_mb"] < 4096  # 4 GB tracemalloc peak
-        )
+        from engine.sla import evaluate_capacity_row, sla_public_dict
+
+        # Hard SLA @ usable 50k (docs/SLA_50K.md · engine/sla.py)
+        sla_eval = evaluate_capacity_row(usable_row, n=ARCH_USABLE_SATS)
+        ok = bool(sla_eval.get("ok"))
         report["verdict_usable"] = {
             "ok": ok,
             "n": ARCH_USABLE_SATS,
@@ -157,7 +154,20 @@ def run_capacity_suite() -> dict:
             "peak_tracemalloc_mb": usable_row["peak_tracemalloc_mb"],
             "prop_ms": usable_row["prop_ms"],
             "cells": usable_row["cells"],
+            "export_json_bytes": usable_row.get("export_json_bytes"),
+            "sla": sla_eval,
+            "sla_contract": {
+                "version": sla_public_dict()["version"],
+                "e2e_hard_s": sla_public_dict()["cold_e2e_usable_s"]["hard"],
+                "peak_mb_hard": sla_public_dict()["peak_tracemalloc_mb_usable"][
+                    "hard"
+                ],
+            },
         }
+        if sla_eval.get("warnings"):
+            print(f"[capacity] SLA warnings @usable: {sla_eval['warnings']}", flush=True)
+        if not ok:
+            print(f"[capacity] SLA FAIL @usable: {sla_eval['failures']}", flush=True)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")

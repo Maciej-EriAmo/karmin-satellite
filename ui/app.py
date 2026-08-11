@@ -4,8 +4,9 @@ Cynober Studio HTTP server (stdlib only).
 
   GET  /              → 2D heatmap UI
   GET  /static/*      → css/js
-  GET  /api/version   → {version}
-  GET  /api/data      → snapshot() + meta
+  GET  /api/version   → {version, sla_version, design_sats}
+  GET  /api/sla       → 50k SLA contract (engine/sla.py)
+  GET  /api/data      → snapshot() + meta  (cells-scale; no O(N) sat dumps)
   GET  /api/filter    → filter_density(shell, min_count)
   POST /api/refresh   → refresh catalog (optional minutes)
   GET  /api/summary   → summary()
@@ -117,6 +118,13 @@ class StudioState:
         else:
             fn = _refresh
 
+        from engine.sla import evaluate_live_interval
+
+        sla_iv = evaluate_live_interval(interval_sec)
+        if sla_iv["level"] == "forbidden":
+            log.warning("feeder SLA: %s", sla_iv["message_en"])
+        elif sla_iv["level"] == "warn":
+            log.warning("feeder SLA: %s", sla_iv["message_en"])
         self.feeder = LiveFeeder(
             fn,
             interval_sec=interval_sec,
@@ -125,6 +133,11 @@ class StudioState:
             refresh_first=refresh_first,
         )
         self.feeder.start()
+        # attach last SLA classification for /api/feeder consumers
+        try:
+            self.feeder.sla_interval = sla_iv  # type: ignore[attr-defined]
+        except Exception:
+            pass
         return self.feeder
 
     def stop_feeder(self) -> dict:
@@ -202,12 +215,32 @@ def create_handler(state: StudioState):
                 self._serve_static(path[len("/static/") :])
                 return
             if path == "/api/version":
+                from engine.sla import SLA_USABLE_SATS, SLA_VERSION
+
                 _json_response(
                     self,
                     200,
                     {
                         "status": "ok",
                         "version": state.amap.get_export_version(),
+                        "sla_version": SLA_VERSION,
+                        "design_sats": SLA_USABLE_SATS,
+                        "sla_path": "/api/sla",
+                    },
+                )
+                return
+            if path == "/api/sla":
+                from engine.sla import sla_public_dict
+
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": sla_public_dict(),
+                        "using": state.using,
+                        "limit": state.limit,
+                        "map_version": state.amap.get_export_version(),
                     },
                 )
                 return
@@ -225,6 +258,8 @@ def create_handler(state: StudioState):
                 )
                 return
             if path == "/api/data":
+                from engine.sla import assert_api_payload_shape
+
                 snap = state.amap.snapshot()
                 import math
 
@@ -234,6 +269,12 @@ def create_handler(state: StudioState):
                 feeder_st = (
                     state.feeder.status() if state.feeder is not None else None
                 )
+                if state.feeder is not None and hasattr(state.feeder, "sla_interval"):
+                    if isinstance(feeder_st, dict):
+                        feeder_st = dict(feeder_st)
+                        feeder_st["sla"] = getattr(state.feeder, "sla_interval", None)
+                from engine.sla import SLA_USABLE_SATS
+
                 payload = {
                     "status": "ok",
                     "data": {
@@ -245,8 +286,16 @@ def create_handler(state: StudioState):
                         "limit": state.limit,
                         "project": "Cynober Studio",
                         "feeder": feeder_st,
+                        "design_sats": SLA_USABLE_SATS,
                     },
                 }
+                issues = assert_api_payload_shape(payload, path="/api/data")
+                if issues:
+                    log.error("SLA API shape violation: %s", issues)
+                    payload["sla_shape_ok"] = False
+                    payload["sla_shape_issues"] = issues
+                else:
+                    payload["sla_shape_ok"] = True
                 _json_response(self, 200, payload)
                 return
             if path == "/api/filter":
