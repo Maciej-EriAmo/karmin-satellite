@@ -200,6 +200,22 @@
       body: JSON.stringify({ minutes: 0, reload_tle: false }),
     });
     await loadData();
+    if (window.CynoberGlobe && document.getElementById("panel-globe")?.style.display !== "none") {
+      window.CynoberGlobe.refresh();
+    }
+  }
+
+  async function saveSnapshot() {
+    const j = await fetchJSON("/api/snapshot/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const d = j.data || {};
+    setText(
+      "snap-info",
+      `saved ${d.snapshot_id || "?"} · cells ${d.cells_count ?? "—"}`
+    );
   }
 
   async function pollVersion() {
@@ -249,6 +265,9 @@
       refreshMap().catch((e) => {
         setText("err", String(e.message || e));
       });
+    });
+    $("btn-snapshot")?.addEventListener("click", () => {
+      saveSnapshot().catch((e) => setText("err", String(e.message || e)));
     });
     $("btn-reset")?.addEventListener("click", () => {
       state.shell = "all";

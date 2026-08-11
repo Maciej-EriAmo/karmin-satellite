@@ -172,5 +172,6 @@ class LiveFeeder:
         except Exception as e:
             self.stats.failures += 1
             self.stats.last_error = str(e)[:300]
-            log.exception("%s refresh failed: %s", self.name, e)
+            # no full traceback noise in tests / production logs
+            log.error("%s refresh failed: %s", self.name, e)
             return False

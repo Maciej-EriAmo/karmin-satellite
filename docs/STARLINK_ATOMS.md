@@ -1,15 +1,15 @@
-# Starlink on Karmazyn atoms
+# Starlink on thermal atoms — Cynober Studio
 
-**Project:** KarmazynOs · `software/starlink_atoms.py`  
-**Status:** MVP complete (phases 0–3 + HTML report)  
+**Project:** Cynober Studio · `engine/`  
+**Status:** MVP complete (phases 0–5: engine, 2D/3D UI, live feed, snapshots)  
 **Language of this doc:** English  
-**Polish plan (archive of phases):** [PLAN_STARLINK_ATOMS.md](PLAN_STARLINK_ATOMS.md)
+**Plan:** [CYNOBER_STUDIO_VERIFIED_PLAN.md](CYNOBER_STUDIO_VERIFIED_PLAN.md)
 
 ---
 
 ## Goal
 
-Show that **one atom substrate** can multi-task a real-scale public workload without a second database:
+Show that **one atom substrate** can multi-task a real-scale public workload without a second database *in process* (snapshots are optional persistence):
 
 | Concern | Same Store |
 |---------|------------|
@@ -17,100 +17,74 @@ Show that **one atom substrate** can multi-task a real-scale public workload wit
 | Heatmap | `starlink:cell` atoms — **temperature T = density** |
 | Grouping | **bubbles** (`starlink`, `sats`, `grid`, `shell:*`) |
 | Query / watch | list HOT·WARM, `state_changed` events |
-| Scripts | Lua tools on an **isolated view Store** |
-| Human view | PNG + self-contained HTML report |
+| Studio UI | 2D canvas + optional 3D globe + filters |
+| Persistence | local JSON snapshots (`out/snapshots/`) |
 
 **Law (kernel):** temperature says *when*; reachability says *whether*.
 
-This is **not** a Starlink ops competitor. It is a **substrate demo**: constellation as load on thermal memory physics shared with media, agents, and OS tools.
+This is **not** a Starlink ops competitor. It is a **substrate product**: constellation as load on thermal memory physics.
 
 ---
 
-## What makes it different
-
-- One lifecycle for sat, cell, GIF frame, and agent fact — not map service + SQL + bus + dashboard.
-- Density lives as **heat** on cells; idle empty bins need not be immortal atoms (`--hot-only`).
-- Guest Lua mounts a **projected Store** so catalog stats are not polluted by the language heap.
-- Public TLE only (Celestrak); no proprietary telemetry.
-
----
-
-## Layout (source of truth)
+## Layout (this repo)
 
 | Path | Role |
 |------|------|
-| `software/starlink_atoms.py` | Host: fetch TLE, SGP4, bubbles, density, heatmap, HTML, Lua isolate |
-| `lua_bin/starlink.lua` | OS tool — catalog view (isolated) |
-| `lua_bin/starlink_hot.lua` | HOT / WARM cell list |
-| `Documents/STARLINK_ATOMS.md` | **This file** (EN overview + proof) |
-| `Documents/PLAN_STARLINK_ATOMS.md` | PL phase checklist (done) |
-| `out/` | Generated only (gitignored): heat PNG, report HTML/JSON, TLE cache |
+| `engine/tle.py` · `prop.py` · `grid.py` · `map.py` | Core engine (modular) |
+| `engine/export_2d.py` · `cli.py` · `live_feeder.py` | Export, CLI, S3b feeder |
+| `engine/starlink_atoms.py` | Compatibility facade |
+| `transform/sphere.py` | S2b sphere quads |
+| `ui/` | Studio HTTP + 2D/3D |
+| `adapters/snapshot_store.py` | S1b local snapshots |
+| `out/` | caches, PNG, HTML, snapshots (gitignored) |
 
-**Not in repo:** regenerated heatmaps, TLE cache (~2 MB), HTML embeds — run CLI to rebuild.
+**KarmazynOs** is optional (`KARMAZYN_OS` for Lua tools only).
 
 ---
 
 ## Quick start
 
 ```powershell
-cd C:\Users\drwis\KarmazynOs
-pip install sgp4 pillow   # once
+cd C:\Users\drwis\cynober_studio
+pip install -r requirements.txt
 
-# Full public catalog, SGP4, hot-only cells, HTML dashboard
-python software/starlink_atoms.py --limit 0 --prop sgp4 --hot-only --html --open-html
+# Offline smoke
+python main.py --offline-demo --limit 40 --hot-only
 
-# Subset + isolated Lua tool
-python software/starlink_atoms.py --limit 400 --prop sgp4 --lua
+# Studio UI (2D default; toggle 3D in UI or --studio-mode 3d)
+python main.py --offline-demo --limit 40 --hot-only --studio --open-browser
 
-# Offline smoke (no network)
-python software/starlink_atoms.py --offline-demo --limit 40 --full-grid --html
+# Live feed (interval seconds; 900 = 15 min)
+python main.py --offline-demo --limit 40 --hot-only --studio --live-feed --interval 30
+
+# Snapshot
+python main.py --offline-demo --limit 40 --hot-only --snapshot-save
+python main.py --snapshot-list
 ```
 
-Dependencies: **sgp4** (propagation), **Pillow** (PNG). Substrate: `KARMAZYN_SUBSTRATE=python` for string atom ids (Lua-friendly).
+Dependencies: **sgp4**, **Pillow**. Substrate: pure-Python (`KARMAZYN_SUBSTRATE=python`).
 
 ---
 
-## Proof of effectiveness (measured MVP)
+## API (Studio)
 
-Runs on a normal desktop (Windows), public Celestrak supplemental Starlink TLE, Python Store:
+| Endpoint | Role |
+|----------|------|
+| `GET /api/data` | snapshot density |
+| `GET /api/sphere` | 3D quads |
+| `GET /api/filter` | shell / min_count |
+| `POST /api/refresh` | re-propagate |
+| `GET /api/feeder` | live feeder status |
+| `GET /api/snapshots` · `POST .../save|load` | local persistence |
 
-| Metric | Result |
-|--------|--------|
-| Catalog size | **~10 768** satellites (full group) |
-| Propagate (SGP4) | **~200–240 ms** full catalog, **0** prop errors (typical run) |
-| Cell atoms (`--hot-only`) | **~2 0xx** bins with count &gt; 0 (not full 2592 grid) |
-| Shell bubbles | e.g. **43° / 53° / 70° / 97° / 98°** from inclination |
-| End-to-end (ingest + bin + heat) | **&lt; 0.5 s** with warm TLE cache |
-| Lua isolate | catalog `alive` **unchanged** after `:tool starlink` |
-| Shared mode (before isolate) | host stats ballooned (~10×–20×) from Lua heap — **fixed by view Store** |
-| HTML | single-file report: canvas density, PNG, shell bars, top cells |
+---
 
-**Qualitative proof of the multi-task thesis:** the same `Store` simultaneously holds sats, heated cells, shell bubbles, and event hooks; a separate guest Store only *views* a projection (meta + cells) so the catalog remains the source of truth.
-
-Reproduce:
+## Tests
 
 ```powershell
-python software/starlink_atoms.py --limit 0 --prop sgp4 --hot-only --lua --html
-# expect: prop_errors=0, catalog after lua total == catalog before, html written under out/
+python -m unittest discover -s tests -v
 ```
 
 ---
 
-## Phase status
-
-| Phase | Status |
-|-------|--------|
-| 0 Spike (atoms, bubbles, PNG) | Done |
-| 1 SGP4 + `--live` | Done |
-| 2 Hot-only density atoms | Done |
-| 3 Lua OS surface + isolate | Done |
-| HTML visualization report | Done |
-
-**Optional later:** boot-time seed for `:tool starlink`, Studio/SDL blit, viewport `note_visible`, KarminQL export, gossip mirror — see plan § Next.
-
----
-
-## X / naming
-
-API and code: **bubbles**.  
-Public jokes about “boobs” are marketing copy only — never identifiers.
+*Home: Cynober Studio · private repo Maciej-EriAmo/cynober_studio*

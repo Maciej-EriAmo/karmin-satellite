@@ -450,9 +450,20 @@ DONE WHEN:
   ☑ roundtrip density == counts
 ```
 
-### Poza zakresem v1
+### Poza zakresem v1 / kolejka po MVP
 
-- Edit atoms (S4c), agent ewolucja satów (S3c), native Rust slab w Studio, Lua w core path, public repo.
+| Item | Priorytet | Notatka |
+|------|-----------|---------|
+| Most RPC → żywy Cynober DB / światy | MED | lokalne snapshoty już są |
+| Soak 30 min live-feed (ops) | LOW | unit feeder OK |
+| Delta JSON / ETag | LOW | version poll wystarcza na MVP |
+| Edit atoms (S4c) | — | out of scope |
+| Agent ewolucja satów (S3c) | — | out of scope |
+| Native Rust slab w Studio | — | optional later |
+| Lua w core path | — | only KARMAZYN_OS bridge |
+| Public repo | — | stays **PRIVATE** |
+
+**Polish done after Faza 5:** rebrand HTML export, UI Save snapshot, docs paths → cynober_studio.
 
 ---
 
