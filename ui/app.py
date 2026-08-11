@@ -349,6 +349,56 @@ def create_handler(state: StudioState):
                 items = [m.as_dict() for m in store.list()]
                 _json_response(self, 200, {"status": "ok", "data": items})
                 return
+            if path == "/api/analyze":
+                # Lightweight density analytics for Studio (cells-scale, SLA-safe)
+                dens = list((state.amap.density or {}).items())
+                counts = sorted(int(c) for _, c in dens)
+                total = sum(counts)
+                max_c = counts[-1] if counts else 0
+                hot = None
+                for (ilat, ilon), c in dens:
+                    if int(c) == max_c:
+                        hot = {"ilat": ilat, "ilon": ilon, "count": int(c)}
+                        break
+                top = sorted(
+                    (
+                        {"ilat": ilat, "ilon": ilon, "count": int(c)}
+                        for (ilat, ilon), c in dens
+                    ),
+                    key=lambda x: -x["count"],
+                )[:12]
+
+                def _pct(p: float) -> int:
+                    if not counts:
+                        return 0
+                    i = min(
+                        len(counts) - 1,
+                        max(0, int(round((p / 100.0) * (len(counts) - 1)))),
+                    )
+                    return int(counts[i])
+
+                summ = state.amap.summary()
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": {
+                            "cells": len(counts),
+                            "sum_count": total,
+                            "max_count": max_c,
+                            "hotspot": hot,
+                            "p50": _pct(50),
+                            "p90": _pct(90),
+                            "top_cells": top,
+                            "shells": summ.get("shells") or {},
+                            "version": summ.get("version"),
+                            "src": state.src,
+                            "using": state.using,
+                        },
+                    },
+                )
+                return
             if path == "/api/health":
                 _json_response(
                     self,
@@ -520,6 +570,17 @@ def create_handler(state: StudioState):
                         json.dumps(payload, ensure_ascii=False, indent=2),
                         encoding="utf-8",
                     )
+                    applied = False
+                    if body.get("apply", True):
+                        from adapters.snapshot_store import load_snapshot_into_map
+
+                        _store, amap, use, src = load_snapshot_into_map(payload)
+                        with state.lock:
+                            state.amap = amap
+                            state.catalog = list(use)
+                            state.src = src
+                            state.using = len(use)
+                        applied = True
                     _json_response(
                         self,
                         200,
@@ -529,6 +590,8 @@ def create_handler(state: StudioState):
                                 "snapshot_id": out_id,
                                 "cells": len(payload.get("density") or []),
                                 "path": str(path_out),
+                                "applied": applied,
+                                "version": getattr(state.amap, "version", 0),
                             },
                         },
                     )
@@ -581,6 +644,11 @@ def create_handler(state: StudioState):
                     state.using = len(use)
                     if state.limit and state.limit > 0:
                         pass  # keep limit field
+                # bump version so UI poll reloads after load
+                if getattr(amap, "version", 0) == 0:
+                    amap.version = 1
+                else:
+                    amap.version = int(amap.version) + 1
                 _json_response(
                     self,
                     200,
@@ -592,6 +660,7 @@ def create_handler(state: StudioState):
                             "cells": len(amap.density),
                             "sats": state.using,
                             "src": src,
+                            "applied": True,
                         },
                     },
                 )

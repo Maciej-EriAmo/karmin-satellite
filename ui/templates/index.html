@@ -52,10 +52,27 @@
       <div class="btns">
         <button class="primary" id="btn-refresh" type="button">Refresh</button>
         <button id="btn-reset" type="button">Reset filter</button>
-        <button id="btn-snapshot" type="button">Save snapshot</button>
+        <button id="btn-snapshot" type="button">Save</button>
+        <button id="btn-rpc-push" type="button" title="Push current map snapshot to Cynober DB">Push DB</button>
       </div>
       <div class="sub" id="snap-info"></div>
       <div class="error" id="err"></div>
+
+      <h2 style="margin-top:1.2rem">Library</h2>
+      <p class="sub" style="margin:0 0 .5rem">Snapshots = frames to load, filter, and view in 2D/3D.</p>
+      <div class="btns">
+        <button id="btn-snap-refresh" type="button">Refresh list</button>
+      </div>
+      <div id="snap-list" class="snap-list"></div>
+      <div class="sub" id="library-info"></div>
+
+      <h2 style="margin-top:1.2rem">Analyze</h2>
+      <div class="stat"><span>View cells</span><b id="an-cells">—</b></div>
+      <div class="stat"><span>Σ count</span><b id="an-sum">—</b></div>
+      <div class="stat"><span>Max count</span><b id="an-max">—</b></div>
+      <div class="stat"><span>Hotspot</span><b id="an-hotspot" style="font-size:.72rem;max-width:58%;text-align:right">—</b></div>
+      <div class="stat"><span>p50 / p90</span><b id="an-pct">—</b></div>
+      <div id="an-top" class="an-top"></div>
 
       <h2 style="margin-top:1.2rem">Shells</h2>
       <div id="shell-list"></div>

@@ -137,6 +137,58 @@
     state._draw = { nlat, nlon, maxC, density, cw, ch, w, h };
   }
 
+  function percentile(sorted, p) {
+    if (!sorted.length) return 0;
+    const i = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+    return sorted[i];
+  }
+
+  function analyzeDensity(density) {
+    const dens = density || [];
+    const counts = dens.map((d) => d.count || 0).sort((a, b) => a - b);
+    const sum = counts.reduce((a, b) => a + b, 0);
+    const maxC = counts.length ? counts[counts.length - 1] : 0;
+    let hot = null;
+    for (const d of dens) {
+      if ((d.count || 0) === maxC) {
+        hot = d;
+        break;
+      }
+    }
+    const top = dens
+      .slice()
+      .sort((a, b) => (b.count || 0) - (a.count || 0))
+      .slice(0, 8);
+    setText("an-cells", dens.length);
+    setText("an-sum", sum);
+    setText("an-max", maxC);
+    if (hot) {
+      const lat0 = -90 + (hot.ilat || 0) * 5;
+      const lon0 = -180 + (hot.ilon || 0) * 5;
+      setText(
+        "an-hotspot",
+        `cell:${hot.ilat}:${hot.ilon} · ~${lat0.toFixed(0)}°,${lon0.toFixed(0)}°`
+      );
+    } else {
+      setText("an-hotspot", "—");
+    }
+    setText(
+      "an-pct",
+      counts.length
+        ? `${percentile(counts, 50)} / ${percentile(counts, 90)}`
+        : "—"
+    );
+    const box = $("an-top");
+    if (box) {
+      box.innerHTML = top
+        .map(
+          (d) =>
+            `<div><span>cell:${d.ilat}:${d.ilon}</span><b>${d.count}</b></div>`
+        )
+        .join("");
+    }
+  }
+
   function drawFromPayload(data) {
     const nlat = data.nlat || 36;
     const nlon = data.nlon || 72;
@@ -144,6 +196,7 @@
     state.view = density;
     drawDensity(density, nlat, nlon);
     updateStats(data.summary, data);
+    analyzeDensity(density);
   }
 
   async function fetchJSON(url, opts) {
@@ -184,11 +237,14 @@
     const nlat = state.full?.nlat || 36;
     const nlon = state.full?.nlon || 72;
     // merge filter into view using full summary for shells
-    drawDensity(d.density || [], nlat, nlon);
+    const dens = d.density || [];
+    drawDensity(dens, nlat, nlon);
+    state.view = dens;
     setText("stat-cells", d.count_cells);
     setText("stat-sats", d.count_sats);
     setText("stat-version", d.version);
     setText("filter-info", `${d.shell} · min≥${d.min_count} · cells ${d.count_cells}`);
+    analyzeDensity(dens);
   }
 
   async function refreshMap() {
@@ -216,6 +272,86 @@
       "snap-info",
       `saved ${d.snapshot_id || "?"} · cells ${d.cells_count ?? "—"}`
     );
+    await listSnapshots();
+  }
+
+  async function listSnapshots() {
+    const box = $("snap-list");
+    if (!box) return;
+    const j = await fetchJSON("/api/snapshots");
+    const items = j.data || [];
+    if (!items.length) {
+      box.innerHTML = `<div class="snap-row"><span class="meta">No local snapshots yet. Save a frame first.</span></div>`;
+      setText("library-info", "empty");
+      return;
+    }
+    box.innerHTML = "";
+    for (const m of items.slice(0, 40)) {
+      const row = document.createElement("div");
+      row.className = "snap-row";
+      if (state.loadedSnap === m.snapshot_id) row.classList.add("active");
+      const left = document.createElement("div");
+      left.innerHTML = `<div><b>${m.snapshot_id}</b></div>
+        <div class="meta">cells ${m.cells_count ?? "—"} · sats ${m.sats_count ?? "—"} · v${m.version ?? 0}<br/>${m.created_at || ""}</div>`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Load";
+      btn.title = "Load into Studio and redraw 2D/3D";
+      btn.addEventListener("click", () => {
+        loadSnapshot(m.snapshot_id).catch((e) =>
+          setText("err", String(e.message || e))
+        );
+      });
+      row.appendChild(left);
+      row.appendChild(btn);
+      box.appendChild(row);
+    }
+    setText("library-info", `${items.length} snapshot(s)`);
+  }
+
+  async function loadSnapshot(snapshotId) {
+    $("badge-status").textContent = "load…";
+    $("badge-status").classList.remove("ok");
+    const j = await fetchJSON("/api/snapshot/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ snapshot_id: snapshotId }),
+    });
+    const d = j.data || {};
+    state.loadedSnap = d.snapshot_id || snapshotId;
+    setText(
+      "snap-info",
+      `loaded ${state.loadedSnap} · cells ${d.cells ?? "—"} · sats ${d.sats ?? "—"}`
+    );
+    // reset filter to full view of loaded frame
+    state.shell = "all";
+    state.minCount = 1;
+    const r = $("min-count");
+    if (r) r.value = "1";
+    setText("min-count-val", "1");
+    setText("filter-info", "all · min≥1 (loaded frame)");
+    await loadData();
+    if (window.CynoberGlobe) window.CynoberGlobe.refresh();
+    await listSnapshots();
+    $("badge-status").textContent = "snapshot";
+    $("badge-status").classList.add("ok");
+  }
+
+  async function pushRpc() {
+    $("badge-status").textContent = "push…";
+    const j = await fetchJSON("/api/rpc/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const d = j.data || {};
+    setText(
+      "snap-info",
+      `rpc-push ${d.snapshot_id || "?"} · ${d.bytes_sent ?? "?"} B · cells ${d.cells ?? "—"}`
+    );
+    $("badge-status").textContent = "live";
+    $("badge-status").classList.add("ok");
+    await listSnapshots();
   }
 
   async function pollVersion() {
@@ -269,6 +405,12 @@
     $("btn-snapshot")?.addEventListener("click", () => {
       saveSnapshot().catch((e) => setText("err", String(e.message || e)));
     });
+    $("btn-rpc-push")?.addEventListener("click", () => {
+      pushRpc().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-snap-refresh")?.addEventListener("click", () => {
+      listSnapshots().catch((e) => setText("err", String(e.message || e)));
+    });
     $("btn-reset")?.addEventListener("click", () => {
       state.shell = "all";
       state.minCount = 1;
@@ -292,6 +434,7 @@
       });
     }
     setupTooltip();
+    listSnapshots().catch(() => {});
     loadData()
       .catch((e) => setText("err", String(e.message || e)))
       .then(() => {

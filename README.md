@@ -57,10 +57,16 @@ python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --op
 | `POST /api/refresh` | `{minutes, reload_tle}` |
 | `GET /api/feeder` | status live feedera |
 | `POST /api/feeder/stop` · `start` | sterowanie feedera |
-| `GET /api/snapshots` | lista snapshotów |
-| `POST /api/snapshot/save` · `load` | S1b lokalny store |
+| `GET /api/snapshots` | lista snapshotów (Library w UI) |
+| `POST /api/snapshot/save` · `load` | Save / Load frame → 2D/3D redraw |
+| `GET /api/analyze` | metryki density (cells, Σ, max, p50/p90, top) |
+| `POST /api/rpc/push` · `pull` | most Cynober DB (opcjonalny) |
 
 stdlib only (no Flask). Quality notes: `docs/CODE_REVIEW.md`.
+
+**Studio workflow (process + visualize):** live map → filter shell/min → 2D/3D →
+**Save** frame → **Library → Load** (redraw) → **Analyze** panel → optional **Push DB**.
+Snapshots are working frames, not archive-only dumps.
 
 ### Snapshots (Faza 5)
 

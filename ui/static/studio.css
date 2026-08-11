@@ -157,6 +157,61 @@ button.primary {
   overflow: hidden;
 }
 
+.snap-list {
+  max-height: 180px;
+  overflow: auto;
+  margin-top: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #100c14;
+}
+
+.snap-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #221c28;
+  font-size: 0.78rem;
+}
+
+.snap-row:last-child { border-bottom: none; }
+
+.snap-row .meta {
+  color: var(--muted);
+  font-size: 0.7rem;
+  word-break: break-all;
+}
+
+.snap-row button {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.72rem;
+}
+
+.snap-row.active {
+  background: #241018;
+  border-left: 2px solid var(--crimson);
+}
+
+.an-top {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-height: 120px;
+  overflow: auto;
+}
+
+.an-top div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #1c1820;
+}
+
+.an-top b { color: var(--warm); font-variant-numeric: tabular-nums; }
+
 canvas {
   display: block;
   width: 100%;
