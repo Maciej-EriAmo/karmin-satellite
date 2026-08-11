@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from engine.bootstrap import ensure_paths
 
@@ -14,6 +15,11 @@ ensure_paths()
 from engine.build import build_map
 from engine.export_2d import export_report_payload, render_heatmap_png, write_html_report
 from engine.lua_bridge import run_lua_tool_name
+
+
+def _json_out(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
+
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(
@@ -145,6 +151,43 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=None,
         help="wczytaj snapshot zamiast TLE build (id bez .json)",
     )
+    ap.add_argument(
+        "--rpc-health",
+        action="store_true",
+        help="sprawdź most Cynober RPC (ZDROWIE) i wyjdź",
+    )
+    ap.add_argument(
+        "--rpc-push",
+        nargs="?",
+        const="__auto__",
+        default=None,
+        help="wyślij snapshot na Cynober DB (id lokalny lub auto po --snapshot-save)",
+    )
+    ap.add_argument(
+        "--rpc-pull",
+        type=str,
+        default=None,
+        help="pobierz snapshot z Cynober RPC i zapisz lokalnie",
+    )
+    ap.add_argument(
+        "--rpc-include-sats",
+        action="store_true",
+        help="przy --rpc-push dołącz TLE satów (domyślnie density-only / SLA)",
+    )
+    ap.add_argument("--rpc-host", type=str, default=None, help="Cynober host (env CYNOBER_HOST)")
+    ap.add_argument("--rpc-port", type=int, default=None, help="Cynober port (env CYNOBER_PORT)")
+    ap.add_argument(
+        "--rpc-profile",
+        type=str,
+        default=None,
+        help="profil ~/.karmazyn_client.json (env CYNOBER_PROFILE)",
+    )
+    ap.add_argument(
+        "--rpc-world",
+        type=str,
+        default=None,
+        help="WYBIERZ ŚWIAT po connect (env CYNOBER_WORLD)",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     from adapters.snapshot_store import SnapshotStore, load_snapshot_into_map
@@ -153,6 +196,55 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         Path(args.snapshot_dir),
         retention_days=int(args.snapshot_retention_days),
     )
+
+    if args.rpc_health:
+        from adapters.cynober_rpc import CynoberRpcBridge, CynoberRpcError, rpc_status_dict
+
+        print(_json_out(rpc_status_dict()))
+        try:
+            with CynoberRpcBridge.from_env(
+                host=args.rpc_host,
+                port=args.rpc_port,
+                profile=args.rpc_profile,
+                world=args.rpc_world,
+            ) as br:
+                h = br.health()
+                print(_json_out(h))
+                return 0 if h.get("status") == "ok" else 1
+        except CynoberRpcError as e:
+            print(f"rpc-health: {e}", file=sys.stderr)
+            return 2
+        except Exception as e:
+            print(f"rpc-health: {e}", file=sys.stderr)
+            return 2
+
+    if args.rpc_pull:
+        from adapters.cynober_rpc import CynoberRpcBridge, CynoberRpcError
+
+        try:
+            with CynoberRpcBridge.from_env(
+                host=args.rpc_host,
+                port=args.rpc_port,
+                profile=args.rpc_profile,
+                world=args.rpc_world,
+            ) as br:
+                payload = br.pull_payload(args.rpc_pull)
+            sid = str(payload.get("snapshot_id") or args.rpc_pull)
+            path = snap_store._path(sid)
+            path.write_text(
+                __import__("json").dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            print(
+                f"rpc-pull: {sid}  cells={len(payload.get('density') or [])} → {path}"
+            )
+            return 0
+        except CynoberRpcError as e:
+            print(f"rpc-pull: {e}", file=sys.stderr)
+            return 2
+        except Exception as e:
+            print(f"rpc-pull: {e}", file=sys.stderr)
+            return 2
 
     if args.snapshot_list:
         items = snap_store.list()
@@ -222,6 +314,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"store={summ['store']}")
     print(f"elapsed={dt:.2f}s")
 
+    last_snap_id: Optional[str] = None
     if args.snapshot_save is not None:
         sid = None if args.snapshot_save == "__auto__" else args.snapshot_save
         meta = snap_store.save(
@@ -230,10 +323,49 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             src=src,
             using=len(use),
         )
+        last_snap_id = meta.snapshot_id
         print(
             f"snapshot-save: {meta.snapshot_id}  cells={meta.cells_count} "
             f"→ {meta.path}"
         )
+
+    if args.rpc_push is not None:
+        from adapters.cynober_rpc import CynoberRpcBridge, CynoberRpcError
+
+        push_id = None if args.rpc_push == "__auto__" else args.rpc_push
+        if push_id is None:
+            # Prefer just-saved local snapshot; else build ephemeral payload
+            if last_snap_id:
+                push_id = last_snap_id
+            else:
+                meta = snap_store.save(
+                    amap, src=src, using=len(use), include_sats=bool(args.rpc_include_sats)
+                )
+                push_id = meta.snapshot_id
+                print(f"snapshot-save (for rpc): {push_id} → {meta.path}")
+        try:
+            with CynoberRpcBridge.from_env(
+                host=args.rpc_host,
+                port=args.rpc_port,
+                profile=args.rpc_profile,
+                world=args.rpc_world,
+            ) as br:
+                result = br.push_from_local_store(
+                    snap_store,
+                    push_id,
+                    include_sats=bool(args.rpc_include_sats),
+                )
+            print(
+                f"rpc-push: {result.snapshot_id}  atom={result.atom_id}  "
+                f"bytes={result.bytes_sent}  cells={result.cells}  "
+                f"world={result.world or '-'}"
+            )
+        except CynoberRpcError as e:
+            print(f"rpc-push: {e}", file=sys.stderr)
+            return 2
+        except Exception as e:
+            print(f"rpc-push: {e}", file=sys.stderr)
+            return 2
 
     if args.studio:
         from ui.app import StudioState, run_studio

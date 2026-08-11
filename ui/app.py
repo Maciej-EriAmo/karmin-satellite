@@ -365,6 +365,49 @@ def create_handler(state: StudioState):
                     },
                 )
                 return
+            if path in ("/api/rpc", "/api/rpc/status"):
+                from adapters.cynober_rpc import rpc_status_dict
+
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": rpc_status_dict()},
+                )
+                return
+            if path == "/api/rpc/health":
+                from adapters.cynober_rpc import (
+                    CynoberRpcBridge,
+                    CynoberRpcError,
+                    rpc_status_dict,
+                )
+
+                base = rpc_status_dict()
+                if not base.get("available"):
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "unavailable",
+                            "data": base,
+                            "message": "cynober_client not available",
+                        },
+                    )
+                    return
+                try:
+                    with CynoberRpcBridge.from_env() as br:
+                        h = br.health()
+                    _json_response(self, 200, {"status": "ok", "data": h})
+                except (CynoberRpcError, Exception) as e:
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "error",
+                            "data": base,
+                            "message": str(e),
+                        },
+                    )
+                return
 
             _json_response(self, 404, {"status": "error", "message": "not found"})
 
@@ -404,6 +447,95 @@ def create_handler(state: StudioState):
                     200,
                     {"status": "ok", "data": feeder.status()},
                 )
+                return
+            if path == "/api/rpc/push":
+                from adapters.cynober_rpc import CynoberRpcBridge, CynoberRpcError
+                from adapters.snapshot_store import SnapshotStore
+
+                body = _read_json_body(self)
+                store = SnapshotStore(
+                    Path(state.snapshot_dir),
+                    retention_days=state.snapshot_retention_days,
+                )
+                sid = body.get("snapshot_id") or body.get("id")
+                include_sats = bool(body.get("include_sats") or False)
+                try:
+                    if not sid:
+                        meta = store.save(
+                            state.amap,
+                            src=state.src,
+                            using=state.using,
+                            include_sats=include_sats,
+                        )
+                        sid = meta.snapshot_id
+                    with CynoberRpcBridge.from_env(
+                        host=body.get("host"),
+                        port=body.get("port"),
+                        profile=body.get("profile"),
+                        world=body.get("world"),
+                    ) as br:
+                        result = br.push_from_local_store(
+                            store, sid, include_sats=include_sats
+                        )
+                    _json_response(
+                        self, 200, {"status": "ok", "data": result.as_dict()}
+                    )
+                except FileNotFoundError as e:
+                    _json_response(
+                        self, 404, {"status": "error", "message": str(e)}
+                    )
+                except (CynoberRpcError, Exception) as e:
+                    _json_response(
+                        self, 502, {"status": "error", "message": str(e)}
+                    )
+                return
+            if path == "/api/rpc/pull":
+                from adapters.cynober_rpc import CynoberRpcBridge, CynoberRpcError
+                from adapters.snapshot_store import SnapshotStore
+
+                body = _read_json_body(self)
+                sid = body.get("snapshot_id") or body.get("id")
+                if not sid:
+                    _json_response(
+                        self,
+                        400,
+                        {"status": "error", "message": "snapshot_id required"},
+                    )
+                    return
+                try:
+                    with CynoberRpcBridge.from_env(
+                        host=body.get("host"),
+                        port=body.get("port"),
+                        profile=body.get("profile"),
+                        world=body.get("world"),
+                    ) as br:
+                        payload = br.pull_payload(str(sid))
+                    store = SnapshotStore(
+                        Path(state.snapshot_dir),
+                        retention_days=state.snapshot_retention_days,
+                    )
+                    out_id = str(payload.get("snapshot_id") or sid)
+                    path_out = store._path(out_id)
+                    path_out.write_text(
+                        json.dumps(payload, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "ok",
+                            "data": {
+                                "snapshot_id": out_id,
+                                "cells": len(payload.get("density") or []),
+                                "path": str(path_out),
+                            },
+                        },
+                    )
+                except (CynoberRpcError, Exception) as e:
+                    _json_response(
+                        self, 502, {"status": "error", "message": str(e)}
+                    )
                 return
             if path == "/api/snapshot/save":
                 from adapters.snapshot_store import SnapshotStore

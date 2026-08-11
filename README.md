@@ -72,6 +72,22 @@ python main.py --snapshot-load snap_YYYYMMDD... --no-heatmap
 
 Pliki: `out/snapshots/*.json` (gitignore). Nie wymaga działającego serwera Cynober.
 
+### Optional Cynober DB RPC (S1b remote)
+
+Local snapshots stay **primary**. Optional bridge pushes density-first JSON to a live Cynober server (KAFS media when available).
+
+```bat
+:: status (no connect if client missing)
+python main.py --rpc-health
+:: build + local snap + push (density-only by default — 50k SLA)
+python main.py --offline-demo --limit 40 --snapshot-save --rpc-push
+:: pull remote → out/snapshots/
+python main.py --rpc-pull snap_YYYYMMDD...
+```
+
+Env: `CYNOBER_HOST` / `CYNOBER_PORT` / `CYNOBER_PROFILE` / `CYNOBER_WORLD` / `CYNOBER_DB` · `CYNOBER_RPC=0` disables.  
+Code: `adapters/cynober_rpc.py` · API: `GET /api/rpc/status` · `POST /api/rpc/push|pull`.
+
 ## Tests & bench (Faza 0–2)
 
 ```bat
