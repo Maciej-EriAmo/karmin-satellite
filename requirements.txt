@@ -1,0 +1,7 @@
+# Cynober Studio — runtime
+sgp4>=2.23
+Pillow>=10.0
+
+# Optional later: web UI, Karmin/DB snapshots
+# flask>=3.0
+# three.js via CDN (no pip)
