@@ -87,14 +87,23 @@ def fetch_starlink_tle(timeout: float = 60.0) -> Tuple[str, str]:
 
 
 def demo_tle_blob(n: int = 12) -> str:
+    """Synthetic TLE catalog of size n (unique norad 1..n for capacity tests).
+
+    TLE wire field is 5-digit; full norad stored after parse from line when
+    possible — for n>99999 we encode unique mean motion / RAAN and set norad
+    via line + post-fix is not needed: parse uses l1[2:7] only (5 digits).
+    For capacity >99999 use build_demo_catalog() instead.
+    """
     parts: List[str] = []
+    n = max(0, int(n))
     for i in range(n):
-        norad = 50000 + i
-        name = f"STARLINK-DEMO-{i:04d}"
+        # unique 1..n; TLE field wraps at 5 digits but we use norad<=99999 for blob path
+        norad = (i % 99999) + 1
+        name = f"STARLINK-DEMO-{i:06d}"
         inc = 53.0 + (i % 5) * 0.1
-        raan = (i * 30.0) % 360.0
+        raan = (i * 0.37) % 360.0
         ma = (i * 17.0) % 360.0
-        nn = 15.06 + (i % 7) * 0.01
+        nn = 15.06 + (i % 97) * 0.001
         l1 = f"1 {norad:05d}U 00000A   26001.00000000  .00000000  00000-0  00000-0 0  9990"
         l2 = (
             f"2 {norad:05d} {inc:8.4f} {raan:8.4f} 0001000 "
@@ -102,6 +111,39 @@ def demo_tle_blob(n: int = 12) -> str:
         )
         parts.extend([name, l1, l2])
     return "\n".join(parts) + "\n"
+
+
+def build_demo_catalog(n: int) -> List[TleSat]:
+    """Unique synthetic sats for capacity (norad = 1..n, works past 5-digit TLE field)."""
+    out: List[TleSat] = []
+    n = max(0, int(n))
+    for i in range(n):
+        norad = i + 1
+        tle_num = norad % 100000
+        name = f"STARLINK-DEMO-{i:06d}"
+        inc = 53.0 + (i % 17) * 0.5
+        raan = (i * 0.37) % 360.0
+        ma = (i * 17.0) % 360.0
+        nn = 15.06 + (i % 97) * 0.001
+        l1 = f"1 {tle_num:05d}U 00000A   26001.00000000  .00000000  00000-0  00000-0 0  9990"
+        l2 = (
+            f"2 {tle_num:05d} {inc:8.4f} {raan:8.4f} 0001000 "
+            f"000.0000 {ma:8.4f} {nn:11.8f}"
+        )
+        out.append(
+            TleSat(
+                name=name,
+                line1=l1,
+                line2=l2,
+                norad=norad,
+                inclination_deg=inc,
+                raan_deg=raan,
+                mean_anomaly_deg=ma,
+                mean_motion_rev_per_day=nn,
+                ecc=0.0001,
+            )
+        )
+    return out
 
 
 def load_tle_text(

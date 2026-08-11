@@ -272,26 +272,19 @@ PSEUDO (później, po stabilnym API exportu):
 
 ---
 
-### A10. Skala — **ARCH_MAX_SATS = 12 000**
+### A10. Skala — usable **50k** · ceiling **100k**
 
 ```
-ASSUME (kanon produktu): jedna mapa Studio ≤ 12_000 satelitów (pure-Python).
-  DEFAULT_LIMIT = 400 (dev)
-  --limit 0 → cały TLE, cap do 12k
-  public Starlink ~10–11k ⊆ 12k
+ASSUME:
+  ARCH_USABLE_SATS  = 50_000   # zalecany budżet użytkowy
+  ARCH_CEILING_SATS = 100_000  # twardy sufit
+  DEFAULT_LIMIT     = 400
 
-VERIFY (historycznie ~10.7k Starlink):
-  prop SGP4 full catalog ~200–240 ms
-  hot cells ~2k
-  e2e <0.5s z cache TLE
-
-PSEUDO bench:
-  for N in [400, 1k, 10k, 12k]:
-    build_map(limit=N); measure prop_ms, cells, RSS
-  assert len(use) <= ARCH_MAX_SATS  (gdy arch_cap)
+VERIFY: tests/test_capacity.py → out/capacity_report.json
+  levels: 1k, 10k, 50k (+100k if CYNOBER_CAPACITY_CEILING=1)
 ```
 
-| Werdykt | **TRUE (budżet)** · full catalog public ⊆ 12k; 50–100k = poza v1 |
+| Werdykt | **TRUE (kanon)** · capacity test w repo |
 
 ---
 

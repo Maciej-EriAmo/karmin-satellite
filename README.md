@@ -4,7 +4,7 @@
 
 Standalone like **Cynober DB**: own substrate + engine. **KarmazynOs is optional** later (native slab, Lua tools).
 
-**Architecture scale:** up to **12 000** satellites per map (`ARCH_MAX_SATS`). CLI default sample is **400**; `--limit 0` loads the full TLE (capped at 12k).
+**Architecture scale:** **50 000** usable · **100 000** ceiling per map. CLI default sample **400**. Capacity test: `python tests\test_capacity.py` → `out/capacity_report.json`.
 
 ## Layout
 

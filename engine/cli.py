@@ -23,12 +23,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--limit",
         type=int,
         default=400,
-        help="ile satelitów wziąć (0 = cały katalog; arch cap = 12000)",
+        help="ile satelitów wziąć (0 = cały katalog; ceiling=100k, usable=50k)",
     )
     ap.add_argument(
         "--no-arch-cap",
         action="store_true",
-        help="nie tnij do ARCH_MAX_SATS=12000 (poza budżetem architektury)",
+        help="nie tnij do ARCH_CEILING_SATS=100000",
     )
     ap.add_argument("--grid", type=float, default=5.0)
     ap.add_argument("--minutes", type=float, default=0.0)

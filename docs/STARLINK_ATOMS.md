@@ -11,12 +11,18 @@
 
 | | |
 |---|---|
-| **ARCH_MAX_SATS** | **12 000** — budżet produktu (pure-Python Store / jedna mapa) |
-| **DEFAULT_LIMIT** | **400** — wygodny dev sample w CLI |
-| **`--limit 0`** | cały TLE po parse, potem cap do 12 000 (wyłączenie: `arch_cap=False` / `--no-arch-cap`) |
-| Public Starlink (typowo) | ~10–11 k w grupie Celestrak — **mieści się w 12 k** |
+| **ARCH_USABLE_SATS** | **50 000** — zalecany budżet użytkowy (test pojemności) |
+| **ARCH_CEILING_SATS** | **100 000** — twardy sufit jednej mapy |
+| **DEFAULT_LIMIT** | **400** — dev sample w CLI |
+| **`--limit 0`** | cały TLE, cap do ceiling (override: `--no-arch-cap`) |
+| Public Starlink (typowo) | ~10–11 k — wygodnie poniżej usable |
 
-Planowe „50–100k” w starych notatkach to horyzont researchowy, **nie** limit v1 Studio.
+```bat
+python tests\test_capacity.py
+:: → out/capacity_report.json  (1k, 10k, 50k)
+:: set CYNOBER_CAPACITY_QUICK=1     :: tylko 1k+10k
+:: set CYNOBER_CAPACITY_CEILING=1   :: +100k (ciężkie)
+```
 
 ## Goal
 

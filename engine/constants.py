@@ -14,11 +14,15 @@ S_CELL = "starlink:cell"
 MU_EARTH = 398600.4418
 R_EARTH = 6378.137
 
-# Architecture budget for Studio pure-Python path (sats in one map/session).
-# Full public Starlink TLE is typically ~10–11k; design ceiling = 12_000.
-# Not a hard Store crash limit — product SoT for scale / memory planning.
-ARCH_MAX_SATS = 12_000
-# CLI default sample size (dev); 0 = entire catalog (still capped at ARCH_MAX_SATS unless forced)
+# ── Scale architecture (pure-Python Studio path) ────────────────────────────
+# Ceiling = hard product max per map/session.
+# Usable  = recommended operating budget (capacity tests target this).
+ARCH_CEILING_SATS = 100_000
+ARCH_USABLE_SATS = 50_000
+# Back-compat alias: historical name pointed at wrong 12k; now = ceiling.
+ARCH_MAX_SATS = ARCH_CEILING_SATS
+
+# CLI default sample size (dev). 0 = entire catalog (capped at ceiling if arch_cap).
 DEFAULT_LIMIT = 400
 
 try:
