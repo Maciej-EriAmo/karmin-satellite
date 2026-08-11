@@ -29,6 +29,21 @@ python main.py --offline-demo --limit 40 --hot-only
 python main.py --limit 400 --prop sgp4 --hot-only --html
 ```
 
+## Tests & bench (Faza 0–1)
+
+```bat
+python -m unittest discover -s tests -v
+python tests\test_bench.py
+:: → out/bench.json
+```
+
+Engine contract (Studio-ready):
+
+- `StarlinkAtomMap.snapshot()` — spójny widok pod UI
+- `filter_density(shell=…, min_count=…)` — S4b backend
+- `refresh(..., ensure=True)` — upsert + GC satów + `version++`
+- `density_cell_consistency()` — hot-only density ↔ cell atoms
+
 Full catalog (needs network for Celestrak TLE, or cache under `out/`):
 
 ```bat

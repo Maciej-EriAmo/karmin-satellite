@@ -342,24 +342,24 @@ PSEUDO bench (Faza 0 Studio — do powtórzenia w tym repo):
 
 ## 4. Plan implementacji (fazy)
 
-### Faza 0 — Baseline w *tym* repo (1 dzień)
+### Faza 0 — Baseline w *tym* repo — **DONE 2026-08-11**
 
 **Cel:** powtarzalne metryki i czysty kontrakt API silnika.
 
 ```
 TASKS:
-  □ docs rebrand STARLINK_ATOMS.md → ścieżki cynober_studio
-  □ tests/test_bench.py: N∈{40, 400, 0} offline|cache; zapis JSON metryk do out/
-  □ tests: density keys == active cell atoms po hot-only refresh
-  □ requirements + README już OK; dodać `python -m pytest` jeśli pytest w env
-  □ Decision freeze: ten dokument = źródło prawdy
+  ☑ tests/test_bench.py → out/bench.json (offline)
+  ☑ density_cell_consistency() + test
+  ☑ unittest discover (bez pytest)
+  ☑ Decision freeze: ten dokument = źródło prawdy
+  □ docs rebrand STARLINK_ATOMS.md paths (kosmetyka)
 
 DONE WHEN:
-  - bench JSON z prop_ms, cells, RSS, errors
-  - smoke + spójność density/cells green
+  - bench JSON z prop_ms, cells, peak mem, export size  ☑
+  - smoke + spójność density/cells green  ☑
 ```
 
-### Faza 1 — Silnik „Studio-ready” (2–3 dni)
+### Faza 1 — Silnik „Studio-ready” — **DONE 2026-08-11**
 
 **Cel:** bezpieczny kontrakt pod UI (audit #1, #7, #12).
 
@@ -367,20 +367,19 @@ DONE WHEN:
 PSEUDO deliverables:
 
   StarlinkAtomMap:
-    + RLock, version
-    + snapshot() → frozen export dict
-    + refresh: nie re-ingest; update meta; GC sat nie w catalog
-    + shell_index: Dict[shell_key, Set[sat_id]]
-    + filter_density(shell, min_count) → list cells + stats
+    ☑ RLock, version
+    ☑ snapshot() → frozen export dict
+    ☑ refresh: ensure_sats + GC sat nie w catalog
+    ☑ shell_index: Dict[shell_key, Set[sat_id]]
+    ☑ filter_density(shell, min_count) → list cells + stats
+    ☑ last_prop_errors + prop_error_rate
 
-  build_map / CLI: bez zmian zachowania one-shot
-
-  errors: list[(norad, reason)]; rate w summary
+  build_map / CLI: one-shot bez regresji
 
 DONE WHEN:
-  - unit: concurrent snapshot vs refresh (2 threads, N iter) bez wyjątku
-  - unit: sat usunięty z catalog → delete lub tomb po refresh GC
-  - unit: filter shell:53 zwraca ⊆ density i spójne count
+  ☑ unit: concurrent snapshot vs refresh
+  ☑ unit: sat GC po refresh(half)
+  ☑ unit: filter shell:53 / empty shell:99
 ```
 
 ### Faza 2 — Presentation 2D jako Studio (2–3 dni)
