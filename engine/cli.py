@@ -105,7 +105,56 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=12.0,
         help="TTL cache TLE przy reload (godziny; 0 = zawsze bierz cache jeśli jest)",
     )
+    ap.add_argument(
+        "--snapshot-dir",
+        type=str,
+        default="out/snapshots",
+        help="katalog snapshotów (Faza 5)",
+    )
+    ap.add_argument(
+        "--snapshot-retention-days",
+        type=int,
+        default=7,
+        help="retencja snapshotów w dniach (0 = bez prune)",
+    )
+    ap.add_argument(
+        "--snapshot-list",
+        action="store_true",
+        help="wypisz lokalne snapshoty i wyjdź",
+    )
+    ap.add_argument(
+        "--snapshot-save",
+        nargs="?",
+        const="__auto__",
+        default=None,
+        help="zapisz snapshot po build (opcjonalne id; domyślnie auto)",
+    )
+    ap.add_argument(
+        "--snapshot-load",
+        type=str,
+        default=None,
+        help="wczytaj snapshot zamiast TLE build (id bez .json)",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
+
+    from adapters.snapshot_store import SnapshotStore, load_snapshot_into_map
+
+    snap_store = SnapshotStore(
+        Path(args.snapshot_dir),
+        retention_days=int(args.snapshot_retention_days),
+    )
+
+    if args.snapshot_list:
+        items = snap_store.list()
+        if not items:
+            print(f"(brak snapshotów w {snap_store.root})")
+            return 0
+        for m in items:
+            print(
+                f"{m.snapshot_id}  cells={m.cells_count} sats={m.sats_count} "
+                f"v={m.version}  {m.created_at}  src={m.src}"
+            )
+        return 0
 
     if args.full_grid:
         hot_only = False
@@ -117,19 +166,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     t0 = time.perf_counter()
     try:
-        store, amap, use, src = build_map(
-            limit=args.limit,
-            grid=args.grid,
-            hot_only=hot_only,
-            prop=args.prop,
-            offline_demo=args.offline_demo,
-            cache=args.cache,
-            backend=args.backend,
-            minutes=args.minutes,
-        )
+        if args.snapshot_load:
+            payload = snap_store.load_raw(args.snapshot_load)
+            store, amap, use, src = load_snapshot_into_map(
+                payload, backend=args.backend
+            )
+            print(f"loaded snapshot={args.snapshot_load}  dens={len(amap.density)}")
+        else:
+            store, amap, use, src = build_map(
+                limit=args.limit,
+                grid=args.grid,
+                hot_only=hot_only,
+                prop=args.prop,
+                offline_demo=args.offline_demo,
+                cache=args.cache,
+                backend=args.backend,
+                minutes=args.minutes,
+            )
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
-        print("Hint: --offline-demo", file=sys.stderr)
+        print("Hint: --offline-demo / --snapshot-load", file=sys.stderr)
         return 2
 
     for _ in range(max(0, args.ticks)):
@@ -154,6 +210,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     print(f"store={summ['store']}")
     print(f"elapsed={dt:.2f}s")
+
+    if args.snapshot_save is not None:
+        sid = None if args.snapshot_save == "__auto__" else args.snapshot_save
+        meta = snap_store.save(
+            amap,
+            snapshot_id=sid,
+            src=src,
+            using=len(use),
+        )
+        print(
+            f"snapshot-save: {meta.snapshot_id}  cells={meta.cells_count} "
+            f"→ {meta.path}"
+        )
 
     if args.studio:
         from ui.app import StudioState, run_studio

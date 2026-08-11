@@ -57,6 +57,8 @@ class StudioState:
     lock: threading.RLock = field(default_factory=threading.RLock)
     feeder: Any = None  # Optional[LiveFeeder]
     studio_mode: str = "2d"  # 2d | 3d (default UI hint)
+    snapshot_dir: str = "out/snapshots"
+    snapshot_retention_days: int = 7
 
     def refresh_catalog(
         self,
@@ -288,6 +290,16 @@ def create_handler(state: StudioState):
                 data["project"] = "Cynober Studio"
                 _json_response(self, 200, {"status": "ok", "data": data})
                 return
+            if path == "/api/snapshots":
+                from adapters.snapshot_store import SnapshotStore
+
+                store = SnapshotStore(
+                    Path(state.snapshot_dir),
+                    retention_days=state.snapshot_retention_days,
+                )
+                items = [m.as_dict() for m in store.list()]
+                _json_response(self, 200, {"status": "ok", "data": items})
+                return
             if path == "/api/health":
                 _json_response(
                     self,
@@ -342,6 +354,65 @@ def create_handler(state: StudioState):
                     self,
                     200,
                     {"status": "ok", "data": feeder.status()},
+                )
+                return
+            if path == "/api/snapshot/save":
+                from adapters.snapshot_store import SnapshotStore
+
+                body = _read_json_body(self)
+                store = SnapshotStore(
+                    Path(state.snapshot_dir),
+                    retention_days=state.snapshot_retention_days,
+                )
+                sid = body.get("snapshot_id") or body.get("id")
+                meta = store.save(
+                    state.amap,
+                    snapshot_id=sid,
+                    src=state.src,
+                    using=state.using,
+                )
+                _json_response(
+                    self, 200, {"status": "ok", "data": meta.as_dict()}
+                )
+                return
+            if path == "/api/snapshot/load":
+                from adapters.snapshot_store import SnapshotStore, load_snapshot_into_map
+
+                body = _read_json_body(self)
+                sid = body.get("snapshot_id") or body.get("id")
+                if not sid:
+                    _json_response(
+                        self,
+                        400,
+                        {"status": "error", "message": "snapshot_id required"},
+                    )
+                    return
+                store = SnapshotStore(
+                    Path(state.snapshot_dir),
+                    retention_days=state.snapshot_retention_days,
+                )
+                payload = store.load_raw(str(sid))
+                _store, amap, use, src = load_snapshot_into_map(payload)
+                with state.lock:
+                    state.amap = amap
+                    state.catalog = list(use)
+                    state.src = src
+                    state.using = len(use)
+                    if state.limit and state.limit > 0:
+                        pass  # keep limit field
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": {
+                            "snapshot_id": sid,
+                            "version": amap.version,
+                            "cells": len(amap.density),
+                            "sats": state.using,
+                            "src": src,
+                        },
+                    },
                 )
                 return
             _json_response(self, 404, {"status": "error", "message": "not found"})

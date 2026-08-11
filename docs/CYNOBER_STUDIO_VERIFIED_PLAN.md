@@ -436,16 +436,18 @@ DONE WHEN:
   ☑ tests/test_sphere.py
 ```
 
-### Faza 5 — Adapter DB (S1b) (2–3 dni)
+### Faza 5 — Adapter snapshot (S1b MVP) — **DONE 2026-08-11**
 
 ```
-  adapters/cynober_db_snapshot.py
-  save/load/list/prune
-  CLI --snapshot-save / --snapshot-load
-  retention 7d default
+  ☑ adapters/snapshot_store.py — lokalny JSON store (jak osobny skarbiec;
+      bez wymogu cynober_server; most RPC opcjonalny później)
+  ☑ save / load / list / prune (retention 7d)
+  ☑ CLI: --snapshot-save [id] --snapshot-load id --snapshot-list --snapshot-dir
+  ☑ API: GET /api/snapshots, POST /api/snapshot/save|load
+  ☑ tests/test_snapshots.py roundtrip density
 
 DONE WHEN:
-  - roundtrip: save → nowy process load → density == (counts)
+  ☑ roundtrip density == counts
 ```
 
 ### Poza zakresem v1

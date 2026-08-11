@@ -51,8 +51,20 @@ python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --op
 | `POST /api/refresh` | `{minutes, reload_tle}` |
 | `GET /api/feeder` | status live feedera |
 | `POST /api/feeder/stop` · `start` | sterowanie feedera |
+| `GET /api/snapshots` | lista snapshotów |
+| `POST /api/snapshot/save` · `load` | S1b lokalny store |
 
 stdlib only (no Flask). Quality notes: `docs/CODE_REVIEW.md`.
+
+### Snapshots (Faza 5)
+
+```bat
+python main.py --offline-demo --limit 40 --snapshot-save
+python main.py --snapshot-list
+python main.py --snapshot-load snap_YYYYMMDD... --no-heatmap
+```
+
+Pliki: `out/snapshots/*.json` (gitignore). Nie wymaga działającego serwera Cynober.
 
 ## Tests & bench (Faza 0–2)
 
