@@ -52,6 +52,17 @@
     setText("stat-errors", summary.prop_errors ?? 0);
     setText("stat-src", meta?.tle_source || "—");
     setText("stat-using", meta?.using ?? "—");
+    const feeder = meta?.feeder;
+    if (feeder && feeder.running) {
+      $("badge-status").textContent = "feeder";
+      $("badge-status").classList.add("ok");
+      setText(
+        "stat-feeder",
+        `on · ${feeder.stats?.successes ?? 0} ok · every ${feeder.interval_sec}s`
+      );
+    } else {
+      setText("stat-feeder", feeder ? "stopped" : "off");
+    }
     const shells = summary.shells || {};
     const box = $("shell-list");
     if (box) {

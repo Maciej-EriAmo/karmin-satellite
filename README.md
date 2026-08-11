@@ -30,10 +30,12 @@ python main.py --offline-demo --limit 40 --hot-only
 python main.py --limit 400 --prop sgp4 --hot-only --html
 ```
 
-## Studio UI (Faza 2)
+## Studio UI (Faza 2–3)
 
 ```bat
 python main.py --offline-demo --limit 40 --studio --open-browser
+:: live feed (interval w sekundach; 15 min = 900)
+python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --open-browser
 :: http://127.0.0.1:8765/
 ```
 
@@ -41,11 +43,13 @@ python main.py --offline-demo --limit 40 --studio --open-browser
 |----------|------|
 | `GET /` | 2D heatmap + filtry |
 | `GET /api/version` | `{version}` |
-| `GET /api/data` | `snapshot()` + nlat/nlon |
+| `GET /api/data` | `snapshot()` + nlat/nlon + feeder |
 | `GET /api/filter?shell=&min_count=` | S4b |
 | `POST /api/refresh` | `{minutes, reload_tle}` |
+| `GET /api/feeder` | status live feedera |
+| `POST /api/feeder/stop` · `start` | sterowanie feedera |
 
-stdlib only (no Flask).
+stdlib only (no Flask). Quality notes: `docs/CODE_REVIEW.md`.
 
 ## Tests & bench (Faza 0–2)
 

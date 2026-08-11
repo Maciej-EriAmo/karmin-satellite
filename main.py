@@ -7,6 +7,7 @@ Standalone product: thermal atom substrate + Starlink engine.
   python main.py --offline-demo --limit 40 --hot-only
   python main.py --limit 400 --prop sgp4 --html
   python main.py --offline-demo --limit 40 --studio --open-browser
+  python main.py --offline-demo --limit 40 --studio --live-feed --interval 30
   python main.py --help
 
 KarmazynOs is optional (env KARMAZYN_OS for Lua tools later).

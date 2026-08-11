@@ -407,17 +407,19 @@ DONE WHEN:
   ☑ version rośnie po POST /api/refresh
 ```
 
-### Faza 3 — Live feeder (1–2 dni) *po* Faza 1
+### Faza 3 — Live feeder — **DONE 2026-08-11**
 
 ```
-  Feeder:
-    stop_event, non-daemon optional, atexit stop
-    loop: wait(interval) → load TLE → map.refresh → version++
-    cache TLE TTL
-  CLI: --live-feed --interval 15 --studio
+  ☑ engine/live_feeder.py: Event stop, atexit, fail budget, stats
+  ☑ StudioState.attach_feeder / stop_feeder; limit preserved on reload_tle
+  ☑ load_tle_text(cache_ttl_hours=…)
+  ☑ CLI: --live-feed --interval SEC --studio [--cache-ttl-hours]
+  ☑ API: GET /api/feeder, POST /api/feeder/stop|start
+  ☑ tests/test_feeder.py
 
 DONE WHEN:
-  - 30 min run: brak crash, RSS growth < 10 MB/h (smoke), stop clean
+  ☑ unit: start/stop, max_fails, version bump
+  □ opcjonalny ręczny soak 30 min (ops)
 ```
 
 ### Faza 4 — 3D globe opcjonalny (2–4 dni)

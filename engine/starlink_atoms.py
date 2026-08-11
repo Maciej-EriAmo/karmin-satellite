@@ -178,14 +178,16 @@ def load_tle_text(
     offline_demo: bool,
     cache: Path,
     limit_hint: int,
+    cache_ttl_hours: float = 12.0,
 ) -> Tuple[str, str]:
     if offline_demo:
         return demo_tle_blob(max(12, limit_hint or 12)), "offline-demo"
     raw = None
     src = ""
+    ttl = max(0.0, float(cache_ttl_hours)) * 3600.0
     if cache.is_file() and cache.stat().st_size > 100:
         age = time.time() - cache.stat().st_mtime
-        if age < 12 * 3600:
+        if ttl <= 0 or age < ttl:
             return (
                 cache.read_text(encoding="utf-8", errors="replace"),
                 f"cache:{cache} ({age / 3600:.1f}h)",
@@ -1654,6 +1656,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         action="store_true",
         help="po --studio otwórz przeglądarkę",
     )
+    ap.add_argument(
+        "--live-feed",
+        action="store_true",
+        help="Faza 3: cykliczny refresh w tle (wymaga --studio lub działa z --live-feed-cli)",
+    )
+    ap.add_argument(
+        "--interval",
+        type=float,
+        default=900.0,
+        help="interwał live-feed w sekundach (domyślnie 900 = 15 min)",
+    )
+    ap.add_argument(
+        "--cache-ttl-hours",
+        type=float,
+        default=12.0,
+        help="TTL cache TLE przy reload (godziny; 0 = zawsze bierz cache jeśli jest)",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     if args.full_grid:
@@ -1707,15 +1726,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.studio:
         from ui.app import StudioState, run_studio
 
-        # studio mode: no PNG by default unless --heatmap path still wanted
         state = StudioState(
             amap=amap,
             catalog=list(use),
             src=src,
             using=len(use),
+            limit=int(args.limit or 0),
             offline_demo=bool(args.offline_demo),
             cache=args.cache,
+            cache_ttl_hours=float(args.cache_ttl_hours),
         )
+        if args.live_feed:
+            state.attach_feeder(
+                interval_sec=float(args.interval),
+                reload_tle=not bool(args.offline_demo),
+                refresh_first=False,
+            )
+            print(
+                f"live-feed ON  interval={args.interval}s  "
+                f"reload_tle={not args.offline_demo}"
+            )
         return run_studio(
             state,
             host=args.host,

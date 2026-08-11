@@ -9,10 +9,13 @@ Cynober Studio HTTP server (stdlib only).
   GET  /api/filter    → filter_density(shell, min_count)
   POST /api/refresh   → refresh catalog (optional minutes)
   GET  /api/summary   → summary()
+  GET  /api/feeder    → live feeder status
+  POST /api/feeder/stop → stop feeder
 """
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import sys
 import threading
@@ -20,7 +23,7 @@ import traceback
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +37,8 @@ if str(_SUB) not in sys.path:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+log = logging.getLogger("cynober.studio")
+
 
 @dataclass
 class StudioState:
@@ -43,34 +48,86 @@ class StudioState:
     catalog: List[Any]
     src: str = ""
     using: int = 0
+    limit: int = 0  # 0 = entire catalog; preserved across reload_tle (Q2 fix)
     offline_demo: bool = False
     cache: str = "out/starlink_tle_cache.txt"
+    cache_ttl_hours: float = 12.0
     meta: dict = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
+    feeder: Any = None  # Optional[LiveFeeder]
 
-    def refresh_catalog(self, *, minutes: float = 0.0, reload_tle: bool = False) -> dict:
-        """Refresh positions; optionally re-fetch TLE text."""
+    def refresh_catalog(
+        self,
+        *,
+        minutes: float = 0.0,
+        reload_tle: bool = False,
+    ) -> dict:
+        """Refresh positions; optionally re-fetch / re-parse TLE text."""
         with self.lock:
-            if reload_tle and not self.offline_demo:
+            if reload_tle:
                 from engine.starlink_atoms import load_tle_text, parse_tle_catalog
 
                 raw, src = load_tle_text(
-                    offline_demo=False,
+                    offline_demo=self.offline_demo,
                     cache=Path(self.cache),
-                    limit_hint=self.using or 12,
+                    limit_hint=self.limit or self.using or 12,
+                    cache_ttl_hours=self.cache_ttl_hours,
                 )
                 catalog = parse_tle_catalog(raw)
-                if self.using and self.using < len(catalog):
-                    # keep original limit if set via using
-                    limit = self.using
-                    catalog = catalog[:limit]
+                if self.limit and self.limit > 0:
+                    catalog = catalog[: self.limit]
                 self.catalog = catalog
                 self.src = src
                 self.using = len(catalog)
             info = self.amap.refresh(self.catalog, minutes=minutes, ensure=True)
             info["src"] = self.src
             info["using"] = self.using
+            info["limit"] = self.limit
             return info
+
+    def attach_feeder(
+        self,
+        *,
+        interval_sec: float = 900.0,
+        reload_tle: bool = True,
+        max_fails: int = 3,
+        refresh_first: bool = False,
+    ) -> Any:
+        from engine.live_feeder import LiveFeeder
+
+        if self.feeder is not None and getattr(self.feeder, "running", False):
+            self.feeder.stop()
+
+        def _refresh() -> dict:
+            return self.refresh_catalog(
+                minutes=0.0,
+                reload_tle=reload_tle and not self.offline_demo,
+            )
+
+        # offline: still cycle refresh (SGP4 time advances with wall clock)
+        if self.offline_demo:
+            def _refresh_offline() -> dict:
+                return self.refresh_catalog(minutes=0.0, reload_tle=False)
+
+            fn = _refresh_offline
+        else:
+            fn = _refresh
+
+        self.feeder = LiveFeeder(
+            fn,
+            interval_sec=interval_sec,
+            max_fails=max_fails,
+            name="studio-feeder",
+            refresh_first=refresh_first,
+        )
+        self.feeder.start()
+        return self.feeder
+
+    def stop_feeder(self) -> dict:
+        if self.feeder is None:
+            return {"running": False, "message": "no feeder"}
+        self.feeder.stop()
+        return self.feeder.status()
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict) -> None:
@@ -98,7 +155,6 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
 def create_handler(state: StudioState):
     class StudioHandler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *args) -> None:
-            # quieter default; still useful
             sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
         def do_OPTIONS(self) -> None:  # noqa: N802
@@ -160,17 +216,20 @@ def create_handler(state: StudioState):
                         "data": state.amap.summary(),
                         "src": state.src,
                         "using": state.using,
+                        "limit": state.limit,
                     },
                 )
                 return
             if path == "/api/data":
                 snap = state.amap.snapshot()
-                # enrich for 2D canvas (nlat/nlon)
-                deg = float(snap.get("grid_deg") or state.amap.grid_deg)
                 import math
 
+                deg = float(snap.get("grid_deg") or state.amap.grid_deg)
                 nlat = int(math.ceil(180.0 / deg))
                 nlon = int(math.ceil(360.0 / deg))
+                feeder_st = (
+                    state.feeder.status() if state.feeder is not None else None
+                )
                 payload = {
                     "status": "ok",
                     "data": {
@@ -179,7 +238,9 @@ def create_handler(state: StudioState):
                         "nlon": nlon,
                         "tle_source": state.src,
                         "using": state.using,
+                        "limit": state.limit,
                         "project": "Cynober Studio",
+                        "feeder": feeder_st,
                     },
                 }
                 _json_response(self, 200, payload)
@@ -199,6 +260,23 @@ def create_handler(state: StudioState):
                     {"status": "ok", "data": filtered},
                 )
                 return
+            if path == "/api/feeder":
+                if state.feeder is None:
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "ok",
+                            "data": {"running": False, "message": "no feeder"},
+                        },
+                    )
+                else:
+                    _json_response(
+                        self,
+                        200,
+                        {"status": "ok", "data": state.feeder.status()},
+                    )
+                return
             if path == "/api/health":
                 _json_response(
                     self,
@@ -207,6 +285,10 @@ def create_handler(state: StudioState):
                         "status": "ok",
                         "service": "cynober-studio",
                         "version": state.amap.get_export_version(),
+                        "feeder": bool(
+                            state.feeder is not None
+                            and getattr(state.feeder, "running", False)
+                        ),
                     },
                 )
                 return
@@ -229,6 +311,27 @@ def create_handler(state: StudioState):
                     {"status": "ok", "data": info},
                 )
                 return
+            if path == "/api/feeder/stop":
+                info = state.stop_feeder()
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
+            if path == "/api/feeder/start":
+                body = _read_json_body(self)
+                interval = float(body.get("interval_sec") or body.get("interval") or 900)
+                reload_tle = body.get("reload_tle")
+                if reload_tle is None:
+                    reload_tle = not state.offline_demo
+                feeder = state.attach_feeder(
+                    interval_sec=interval,
+                    reload_tle=bool(reload_tle),
+                    refresh_first=bool(body.get("refresh_first") or False),
+                )
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": feeder.status()},
+                )
+                return
             _json_response(self, 404, {"status": "error", "message": "not found"})
 
         def _serve_index(self) -> None:
@@ -247,7 +350,6 @@ def create_handler(state: StudioState):
             self.wfile.write(data)
 
         def _serve_static(self, rel: str) -> None:
-            # prevent path escape
             rel = rel.replace("\\", "/").lstrip("/")
             if ".." in rel.split("/"):
                 _json_response(self, 403, {"status": "error", "message": "forbidden"})
@@ -277,13 +379,15 @@ def run_studio(
     port: int = 8765,
     open_browser: bool = False,
 ) -> int:
-    """Blocking studio server. Returns 0 on clean KeyboardInterrupt."""
+    """Blocking studio server. Stops feeder on exit."""
     handler = create_handler(state)
     httpd = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"Cynober Studio  {url}")
-    print(f"  TLE={state.src}  sats={state.using}  version={state.amap.version}")
-    print("  API: /api/version  /api/data  /api/filter  POST /api/refresh")
+    print(f"  TLE={state.src}  sats={state.using}  limit={state.limit}  version={state.amap.version}")
+    if state.feeder is not None:
+        print(f"  feeder: interval={state.feeder.interval_sec}s running={state.feeder.running}")
+    print("  API: /api/version  /api/data  /api/filter  /api/feeder  POST /api/refresh")
     print("  Ctrl+C to stop")
     if open_browser:
         try:
@@ -297,6 +401,7 @@ def run_studio(
     except KeyboardInterrupt:
         print("\nStudio stopped.")
     finally:
+        state.stop_feeder()
         httpd.server_close()
     return 0
 
@@ -313,6 +418,8 @@ def build_and_run(
     host: str = "127.0.0.1",
     port: int = 8765,
     open_browser: bool = False,
+    live_feed: bool = False,
+    interval_sec: float = 900.0,
 ) -> int:
     from engine.starlink_atoms import build_map
 
@@ -330,8 +437,15 @@ def build_and_run(
         catalog=list(use),
         src=src,
         using=len(use),
+        limit=int(limit or 0),
         offline_demo=offline_demo,
         cache=cache,
         meta={"store": type(store).__name__},
     )
+    if live_feed:
+        state.attach_feeder(
+            interval_sec=interval_sec,
+            reload_tle=not offline_demo,
+            refresh_first=False,
+        )
     return run_studio(state, host=host, port=port, open_browser=open_browser)
