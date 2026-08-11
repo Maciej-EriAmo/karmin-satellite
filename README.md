@@ -4,7 +4,9 @@
 
 Standalone like **Cynober DB**: own substrate + engine. **KarmazynOs is optional** later (native slab, Lua tools).
 
-**Architecture scale:** **50 000** usable · **100 000** ceiling per map. CLI default sample **400**. Capacity test: `python tests\test_capacity.py` → `out/capacity_report.json`.
+**Architecture scale (measured):** **50 000** usable · **100 000** ceiling.  
+Canon: [`docs/ARCHITECTURE_LIMITS.md`](docs/ARCHITECTURE_LIMITS.md) · baseline JSON: [`docs/capacity_baseline.json`](docs/capacity_baseline.json).  
+CLI default sample **400**. Re-run: `python tests\test_capacity.py` (add `CYNOBER_CAPACITY_CEILING=1` for 100k).
 
 ## Layout
 

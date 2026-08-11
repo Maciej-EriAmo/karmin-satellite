@@ -15,14 +15,15 @@ MU_EARTH = 398600.4418
 R_EARTH = 6378.137
 
 # ── Scale architecture (pure-Python Studio path) ────────────────────────────
-# Ceiling = hard product max per map/session.
-# Usable  = recommended operating budget (capacity tests target this).
-ARCH_CEILING_SATS = 100_000
-ARCH_USABLE_SATS = 50_000
-# Back-compat alias: historical name pointed at wrong 12k; now = ceiling.
+# Kanon: docs/ARCHITECTURE_LIMITS.md  ·  baseline: docs/capacity_baseline.json
+# Measured 2026-08-11: 50k ~5.7s e2e, 100k ~11.6s e2e, 0 prop errors (SGP4 hot-only).
+ARCH_USABLE_SATS = 50_000  # recommended operating budget (design target)
+ARCH_CEILING_SATS = 100_000  # hard max per map/session (build_map arch_cap)
+# Back-compat alias (= ceiling). Do not reintroduce 12k.
 ARCH_MAX_SATS = ARCH_CEILING_SATS
 
-# CLI default sample size (dev). 0 = entire catalog (capped at ceiling if arch_cap).
+# CLI default sample size (dev only — NOT product max).
+# 0 = entire catalog (capped at ceiling if arch_cap).
 DEFAULT_LIMIT = 400
 
 try:

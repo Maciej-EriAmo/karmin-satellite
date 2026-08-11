@@ -162,6 +162,14 @@ def run_capacity_suite() -> dict:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"[capacity] wrote {OUT}", flush=True)
+    # Optional: refresh tracked baseline when full ceiling suite ran
+    if do_ceiling and not quick:
+        bas = ROOT / "docs" / "capacity_baseline.json"
+        bas_payload = dict(report)
+        bas_payload["document"] = "capacity_baseline"
+        bas_payload["see"] = "docs/ARCHITECTURE_LIMITS.md"
+        bas.write_text(json.dumps(bas_payload, indent=2), encoding="utf-8")
+        print(f"[capacity] updated {bas}", flush=True)
     return report
 
 

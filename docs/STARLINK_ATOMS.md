@@ -9,19 +9,19 @@
 
 ## Scale (architecture)
 
+**Canon:** [ARCHITECTURE_LIMITS.md](ARCHITECTURE_LIMITS.md) · [capacity_baseline.json](capacity_baseline.json)
+
 | | |
 |---|---|
-| **ARCH_USABLE_SATS** | **50 000** — zalecany budżet użytkowy (test pojemności) |
-| **ARCH_CEILING_SATS** | **100 000** — twardy sufit jednej mapy |
-| **DEFAULT_LIMIT** | **400** — dev sample w CLI |
-| **`--limit 0`** | cały TLE, cap do ceiling (override: `--no-arch-cap`) |
-| Public Starlink (typowo) | ~10–11 k — wygodnie poniżej usable |
+| **ARCH_USABLE_SATS** | **50 000** — budżet użytkowy (zmierzone OK ~5.7 s e2e) |
+| **ARCH_CEILING_SATS** | **100 000** — sufit (zmierzone OK ~11.6 s e2e) |
+| **DEFAULT_LIMIT** | **400** — dev sample CLI |
+| Public Starlink | ~10–11 k — poniżej usable |
 
 ```bat
 python tests\test_capacity.py
-:: → out/capacity_report.json  (1k, 10k, 50k)
-:: set CYNOBER_CAPACITY_QUICK=1     :: tylko 1k+10k
-:: set CYNOBER_CAPACITY_CEILING=1   :: +100k (ciężkie)
+set CYNOBER_CAPACITY_CEILING=1
+python tests\test_capacity.py
 ```
 
 ## Goal
