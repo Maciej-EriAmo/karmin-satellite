@@ -488,7 +488,7 @@ DONE WHEN:
 | **H5** alt-band / sunlit | later | pasy wysokości + day/night fraction |
 | **H6** 3D radiation intensity | **later (explicit)** | warstwa natężenia na globe quads (TODO w `ui/static/globe.js`) |
 | **H7** multi-fleet catalogs | later | `CatalogProvider` · Starlink first · NASA TLE / Celestrak groups / country filter (public only) |
-| **H8** adaptive UX | later | cell size →1px przy full catalog; view **grupami**; radiation = **mgła na kartuszu/obrzeżu** okna (nie w density) · `docs/HAZARD_LAYER.md` |
+| **H8** adaptive UX | later | **mało satów → duże px**; **duży katalog → ~1 px** (`cell_px ∝ 1/n_sats`); view **grupami**; radiation = **mgła na obrzeżu** · `docs/HAZARD_LAYER.md` |
 
 ### Co następne (kolejność commitów)
 
@@ -498,7 +498,7 @@ DONE WHEN:
 3. H6  3D radiation intensity on globe (after H3/H4 solid)
 4. H5  alt-band / sunlit polish
 5. H7  multi-fleet open catalogs (post-Starlink research expansion)
-6. H8  adaptive pixels + group load + edge-fog radiation (full-catalog readability)
+6. H8  adaptive pixels (few→large, many→~1px) + group load + edge-fog radiation
 ```
 
 ---
