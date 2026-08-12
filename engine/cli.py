@@ -188,7 +188,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=None,
         help="WYBIERZ ŚWIAT po connect (env CYNOBER_WORLD)",
     )
+    ap.add_argument(
+        "--weather",
+        action="store_true",
+        help="pobierz publiczną pogodę kosmiczną NOAA SWPC i wypisz JSON",
+    )
+    ap.add_argument(
+        "--weather-offline",
+        action="store_true",
+        help="z --weather: tylko cache/stub (bez sieci)",
+    )
+    ap.add_argument(
+        "--weather-force",
+        action="store_true",
+        help="z --weather: pomiń TTL cache",
+    )
+    ap.add_argument(
+        "--hazard",
+        action="store_true",
+        help="oceń hazard solar (global + shell) po build mapy",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
+
+    if args.weather and not args.hazard and not args.studio and args.snapshot_load is None:
+        # weather-only early exit (no TLE build required)
+        from adapters.space_weather import get_space_weather
+
+        snap = get_space_weather(
+            force=bool(args.weather_force),
+            offline=bool(args.weather_offline),
+        )
+        print(_json_out(snap.as_dict()))
+        return 0
 
     from adapters.snapshot_store import SnapshotStore, load_snapshot_into_map
 
@@ -313,6 +344,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     print(f"store={summ['store']}")
     print(f"elapsed={dt:.2f}s")
+
+    if args.weather or args.hazard:
+        from adapters.space_weather import get_space_weather
+        from engine.hazard import assess_from_amap, short_badge
+
+        wx = get_space_weather(
+            force=bool(args.weather_force),
+            offline=bool(args.weather_offline),
+        )
+        if args.weather:
+            print("--- weather ---")
+            print(_json_out(wx.as_dict()))
+        if args.hazard:
+            haz = assess_from_amap(amap, wx)
+            print("--- hazard ---")
+            print(short_badge(haz))
+            print(_json_out(haz.as_dict()))
 
     last_snap_id: Optional[str] = None
     if args.snapshot_save is not None:

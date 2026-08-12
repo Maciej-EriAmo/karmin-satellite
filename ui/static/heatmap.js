@@ -9,6 +9,10 @@
     shell: "all",
     minCount: 1,
     pollMs: 5000,
+    layer: "density", // density | hazard | blend
+    hazard: null,
+    nlat: 36,
+    nlon: 72,
   };
 
   function tToRgb(T, T_MAX = 100) {
@@ -109,7 +113,80 @@
     $("badge-status").classList.add("ok");
   }
 
-  function drawDensity(density, nlat, nlon) {
+  /** Purple→magenta→red ramp for solar exposure proxy (distinct from density T). */
+  function hazardToRgb(exposure, maxExp) {
+    const mc = maxExp > 0 ? maxExp : 100;
+    const x = Math.max(0, Math.min(1, (exposure || 0) / mc));
+    if (x < 0.4) {
+      const k = x / 0.4;
+      return [
+        Math.floor(20 + 80 * k),
+        Math.floor(10 + 20 * k),
+        Math.floor(60 + 100 * k),
+      ];
+    }
+    if (x < 0.75) {
+      const k = (x - 0.4) / 0.35;
+      return [
+        Math.floor(100 + 120 * k),
+        Math.floor(30 + 40 * k),
+        Math.floor(160 + 40 * k),
+      ];
+    }
+    const k = (x - 0.75) / 0.25;
+    return [Math.floor(220 + 35 * k), Math.floor(40 * (1 - k)), Math.floor(80 * (1 - k))];
+  }
+
+  function baseScoreFromHazard() {
+    const h = state.hazard;
+    if (!h) return 20;
+    const shell = state.shell || "all";
+    if (shell !== "all" && h.groups) {
+      const sk = String(shell).startsWith("shell:") ? shell : `shell:${shell}`;
+      const g = h.groups.find((x) => x.kind === "shell" && x.group_id === sk);
+      if (g) return Number(g.score) || h.global_score || 20;
+    }
+    return Number(h.global_score) || 20;
+  }
+
+  function exposureForCell(count, maxC, baseScore) {
+    const mc = maxC <= 0 ? 1 : maxC;
+    const c = count || 0;
+    const weight = 0.3 + 0.7 * (Math.log1p(c) / Math.log1p(mc));
+    return Math.max(0, Math.min(100, baseScore * weight));
+  }
+
+  function redrawMap() {
+    const density = state.view || [];
+    const nlat = state.nlat || 36;
+    const nlon = state.nlon || 72;
+    drawMap(density, nlat, nlon, state.layer || "density");
+  }
+
+  function setLayer(layer) {
+    state.layer = layer;
+    ["density", "hazard", "blend"].forEach((L) => {
+      const btn = $(`btn-layer-${L}`);
+      if (btn) btn.classList.toggle("primary", L === layer);
+    });
+    const titles = {
+      density: "density",
+      hazard: "solar exposure (proxy)",
+      blend: "density + hazard blend",
+    };
+    setText("map2d-title", titles[layer] || layer);
+    setText(
+      "layer-info",
+      layer === "density"
+        ? "density · solar overlay off"
+        : layer === "hazard"
+          ? "hazard · density off (research proxy)"
+          : "blend · density hue + exposure weight"
+    );
+    redrawMap();
+  }
+
+  function drawMap(density, nlat, nlon, layer) {
     const canvas = $("heatmap");
     if (!canvas) return;
     const w = Math.max(360, nlon * 8);
@@ -120,21 +197,61 @@
     ctx.fillStyle = "#08060a";
     ctx.fillRect(0, 0, w, h);
 
-    const maxC = density.reduce((m, d) => Math.max(m, d.count || 0), 1);
+    const dens = density || [];
+    const maxC = dens.reduce((m, d) => Math.max(m, d.count || 0), 1);
+    const base = baseScoreFromHazard();
+    const exposures = dens.map((d) =>
+      exposureForCell(d.count || 0, maxC, base)
+    );
+    const maxExp = Math.max(base, ...exposures, 1);
     const cw = w / nlon;
     const ch = h / nlat;
+    const mode = layer || "density";
 
-    for (const d of density) {
-      const T = densityToT(d.count || 0, maxC);
-      const [r, g, b] = tToRgb(T);
+    for (let i = 0; i < dens.length; i++) {
+      const d = dens[i];
+      const exp = exposures[i];
+      let r, g, b;
+      if (mode === "hazard") {
+        [r, g, b] = hazardToRgb(exp, maxExp);
+      } else if (mode === "blend") {
+        const T = densityToT(d.count || 0, maxC);
+        const [dr, dg, db] = tToRgb(T);
+        const [hr, hg, hb] = hazardToRgb(exp, maxExp);
+        // weight hazard by relative exposure
+        const a = Math.max(0.25, Math.min(0.75, exp / maxExp));
+        r = Math.floor(dr * (1 - a) + hr * a);
+        g = Math.floor(dg * (1 - a) + hg * a);
+        b = Math.floor(db * (1 - a) + hb * a);
+      } else {
+        const T = densityToT(d.count || 0, maxC);
+        [r, g, b] = tToRgb(T);
+      }
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       const x = d.ilon * cw;
       const y = (nlat - 1 - d.ilat) * ch;
       ctx.fillRect(x, y, Math.ceil(cw), Math.ceil(ch));
     }
 
-    // store for tooltip
-    state._draw = { nlat, nlon, maxC, density, cw, ch, w, h };
+    state._draw = {
+      nlat,
+      nlon,
+      maxC,
+      maxExp,
+      base,
+      density: dens,
+      exposures,
+      cw,
+      ch,
+      w,
+      h,
+      layer: mode,
+    };
+  }
+
+  /** @deprecated use drawMap */
+  function drawDensity(density, nlat, nlon) {
+    drawMap(density, nlat, nlon, state.layer || "density");
   }
 
   function percentile(sorted, p) {
@@ -193,8 +310,10 @@
     const nlat = data.nlat || 36;
     const nlon = data.nlon || 72;
     const density = data.density || [];
+    state.nlat = nlat;
+    state.nlon = nlon;
     state.view = density;
-    drawDensity(density, nlat, nlon);
+    drawMap(density, nlat, nlon, state.layer || "density");
     updateStats(data.summary, data);
     analyzeDensity(density);
   }
@@ -238,8 +357,10 @@
     const nlon = state.full?.nlon || 72;
     // merge filter into view using full summary for shells
     const dens = d.density || [];
-    drawDensity(dens, nlat, nlon);
+    state.nlat = nlat;
+    state.nlon = nlon;
     state.view = dens;
+    drawMap(dens, nlat, nlon, state.layer || "density");
     setText("stat-cells", d.count_cells);
     setText("stat-sats", d.count_sats);
     setText("stat-version", d.version);
@@ -365,6 +486,74 @@
     }
   }
 
+  function setHazardBadgeClass(el, severity) {
+    if (!el) return;
+    el.classList.remove("ok", "warn", "danger");
+    const s = String(severity || "").toUpperCase();
+    if (s === "WARNING") el.classList.add("danger");
+    else if (s === "WATCH") el.classList.add("warn");
+    else el.classList.add("ok");
+  }
+
+  function renderHazard(data) {
+    if (!data) return;
+    state.hazard = data;
+    const w = data.weather || {};
+    setText("wx-flare", w.flare_class || "—");
+    setText("wx-f107", w.f107 != null ? Number(w.f107).toFixed(0) : "—");
+    setText("wx-kp", w.kp != null ? Number(w.kp).toFixed(2) : "—");
+    setText("wx-mode", w.mode || "—");
+    setText("wx-stress", data.global_score != null ? Number(data.global_score).toFixed(0) : "—");
+    setText("wx-sev", data.severity || "—");
+    const disc = $("wx-disclaimer");
+    if (disc) {
+      disc.textContent = data.disclaimer || "Public indices · research proxy";
+    }
+    const badgeWx = $("badge-weather");
+    if (badgeWx) {
+      const fc = w.flare_class || "?";
+      const f107 = w.f107 != null ? Number(w.f107).toFixed(0) : "—";
+      const kp = w.kp != null ? Number(w.kp).toFixed(1) : "—";
+      badgeWx.textContent = `solar ${fc} · F${f107} · Kp ${kp}`;
+      setHazardBadgeClass(badgeWx, data.severity);
+    }
+    const badgeHz = $("badge-hazard");
+    if (badgeHz) {
+      badgeHz.textContent =
+        data.badge ||
+        `hazard ${data.global_score != null ? Number(data.global_score).toFixed(0) : "—"} · ${data.severity || ""}`;
+      setHazardBadgeClass(badgeHz, data.severity);
+    }
+    const box = $("hazard-shell-list");
+    if (box) {
+      const shells = (data.groups || []).filter((g) => g.kind === "shell");
+      if (!shells.length) {
+        box.innerHTML = `<div><span>no shells</span><b>—</b></div>`;
+      } else {
+        box.innerHTML = shells
+          .slice(0, 12)
+          .map(
+            (g) =>
+              `<div><span>${g.group_id} · n=${g.n_sats}</span><b>${Number(
+                g.score
+              ).toFixed(0)} ${g.severity}</b></div>`
+          )
+          .join("");
+      }
+    }
+    // refresh overlay colors when weather updates
+    if (state.view && (state.layer === "hazard" || state.layer === "blend")) {
+      redrawMap();
+    }
+  }
+
+  async function loadWeatherHazard(force) {
+    const q = force ? "?force=1" : "";
+    const j = await fetchJSON(`/api/hazard${q}`);
+    state.hazard = j.data;
+    renderHazard(j.data);
+  }
+
   function setupTooltip() {
     const canvas = $("heatmap");
     const tip = $("tooltip");
@@ -379,14 +568,19 @@
       const y = (ev.clientY - rect.top) * sy;
       const ilon = Math.floor(x / d.cw);
       const ilat = d.nlat - 1 - Math.floor(y / d.ch);
-      const cell = d.density.find((c) => c.ilat === ilat && c.ilon === ilon);
+      const idx = d.density.findIndex((c) => c.ilat === ilat && c.ilon === ilon);
+      const cell = idx >= 0 ? d.density[idx] : null;
       if (!cell) {
         tip.classList.remove("show");
         return;
       }
       const lat0 = -90 + ilat * (180 / d.nlat);
       const lon0 = -180 + ilon * (360 / d.nlon);
-      tip.innerHTML = `<b>cell:${ilat}:${ilon}</b><br/>count=${cell.count}<br/>≈ ${lat0.toFixed(
+      const exp =
+        d.exposures && d.exposures[idx] != null
+          ? Number(d.exposures[idx]).toFixed(1)
+          : "—";
+      tip.innerHTML = `<b>cell:${ilat}:${ilon}</b><br/>count=${cell.count}<br/>exposure≈${exp}<br/>≈ ${lat0.toFixed(
         1
       )}°, ${lon0.toFixed(1)}°`;
       tip.style.left = `${ev.clientX - rect.left + 12}px`;
@@ -411,6 +605,12 @@
     $("btn-snap-refresh")?.addEventListener("click", () => {
       listSnapshots().catch((e) => setText("err", String(e.message || e)));
     });
+    $("btn-weather")?.addEventListener("click", () => {
+      loadWeatherHazard(true).catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-layer-density")?.addEventListener("click", () => setLayer("density"));
+    $("btn-layer-hazard")?.addEventListener("click", () => setLayer("hazard"));
+    $("btn-layer-blend")?.addEventListener("click", () => setLayer("blend"));
     $("btn-reset")?.addEventListener("click", () => {
       state.shell = "all";
       state.minCount = 1;
@@ -435,12 +635,19 @@
     }
     setupTooltip();
     listSnapshots().catch(() => {});
+    loadWeatherHazard(false).catch(() => {
+      setText("badge-weather", "solar offline");
+    });
     loadData()
       .catch((e) => setText("err", String(e.message || e)))
       .then(() => {
         setInterval(() => {
           pollVersion();
         }, state.pollMs);
+        // weather slower than map poll
+        setInterval(() => {
+          loadWeatherHazard(false).catch(() => {});
+        }, Math.max(state.pollMs * 12, 60000));
       });
   }
 

@@ -12,10 +12,12 @@
       <h1><span>Cynober</span> Studio</h1>
       <div class="sub">thermal atoms · Starlink density · 2D / 3D</div>
     </div>
-    <div>
+    <div class="header-badges">
       <span class="badge" id="badge-status">boot</span>
       <span class="badge">v<span id="stat-version">0</span></span>
       <span class="badge" id="badge-mode">2d</span>
+      <span class="badge" id="badge-weather" title="Public NOAA SWPC solar indices (research proxy)">solar —</span>
+      <span class="badge" id="badge-hazard" title="Group solar hazard proxy">hazard —</span>
     </div>
   </header>
 
@@ -26,6 +28,14 @@
         <button type="button" id="btn-mode-2d" class="primary">2D heatmap</button>
         <button type="button" id="btn-mode-3d">3D globe</button>
       </div>
+      <h2 style="margin-top:1rem">2D layer</h2>
+      <div class="btns" id="layer-btns">
+        <button type="button" id="btn-layer-density" class="primary" title="Satellite density">Density</button>
+        <button type="button" id="btn-layer-hazard" title="Solar exposure proxy">Hazard</button>
+        <button type="button" id="btn-layer-blend" title="Density + hazard blend">Blend</button>
+      </div>
+      <div class="sub" id="layer-info">density · solar overlay off</div>
+      <p class="sub" style="margin:.35rem 0 0">3D radiation intensity layer — later</p>
 
       <h2 style="margin-top:1.2rem">Stats</h2>
       <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
@@ -74,18 +84,38 @@
       <div class="stat"><span>p50 / p90</span><b id="an-pct">—</b></div>
       <div id="an-top" class="an-top"></div>
 
+      <h2 style="margin-top:1.2rem">Solar weather</h2>
+      <p class="sub" style="margin:0 0 .5rem">Public NOAA SWPC · research proxy only</p>
+      <div class="stat"><span>Flare</span><b id="wx-flare">—</b></div>
+      <div class="stat"><span>F10.7</span><b id="wx-f107">—</b></div>
+      <div class="stat"><span>Kp</span><b id="wx-kp">—</b></div>
+      <div class="stat"><span>Mode</span><b id="wx-mode">—</b></div>
+      <div class="stat"><span>Stress</span><b id="wx-stress">—</b></div>
+      <div class="stat"><span>Severity</span><b id="wx-sev">—</b></div>
+      <div class="btns">
+        <button id="btn-weather" type="button">Refresh weather</button>
+      </div>
+      <div class="sub" id="wx-disclaimer" style="margin-top:.4rem"></div>
+
+      <h2 style="margin-top:1.2rem">Shell hazard</h2>
+      <div id="hazard-shell-list" class="an-top"></div>
+
       <h2 style="margin-top:1.2rem">Shells</h2>
       <div id="shell-list"></div>
     </aside>
 
     <section class="panel" id="panel-heatmap">
-      <h2>Density map (2D)</h2>
+      <h2>Map (2D) · <span id="map2d-title" class="sub">density</span></h2>
       <div class="viz-wrap">
         <canvas id="heatmap" width="720" height="360"></canvas>
         <div class="tooltip" id="tooltip"></div>
       </div>
+      <div class="legend-row" id="map-legend">
+        <span class="leg-swatch dens"></span><span class="sub">density</span>
+        <span class="leg-swatch haz"></span><span class="sub">solar exposure (proxy)</span>
+      </div>
       <p class="sub" style="margin:.75rem 0 0">
-        Hover cell · filter by shell / min count · poll <code>/api/version</code> every 5s.
+        Hover cell · layer Density / Hazard / Blend · filter shell / min · poll every 5s.
       </p>
     </section>
 

@@ -1,4 +1,9 @@
-/* Cynober Studio — S2b 3D globe (Three.js CDN) */
+/* Cynober Studio — S2b 3D globe (Three.js CDN)
+ *
+ * TODO (later): solar radiation intensity layer on globe quads
+ * (same exposure proxy as 2D hazard, or X-ray/F10.7-driven tint).
+ * Do not block 2D H2 work — density quads only for now.
+ */
 (() => {
   const $ = (id) => document.getElementById(id);
 

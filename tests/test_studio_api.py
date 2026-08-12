@@ -98,6 +98,33 @@ class TestStudioAPI(unittest.TestCase):
         self.assertEqual(j["status"], "ok")
         self.assertGreater(j["data"]["version"], v0["version"])
 
+    def test_weather_offline_and_hazard(self):
+        st, j = self._get("/api/weather?offline=1")
+        self.assertEqual(st, 200)
+        self.assertEqual(j["status"], "ok")
+        self.assertIn("flare_class", j["data"])
+        self.assertIn(j["data"]["mode"], ("stub", "cache", "live"))
+        st, j = self._get("/api/hazard?offline=1")
+        self.assertEqual(st, 200)
+        d = j["data"]
+        self.assertIn("global_score", d)
+        self.assertIn("groups", d)
+        self.assertIn("badge", d)
+        self.assertGreaterEqual(len(d["groups"]), 1)
+
+    def test_hazard_grid_overlay(self):
+        st, j = self._get("/api/hazard?offline=1&grid=1")
+        self.assertEqual(st, 200)
+        d = j["data"]
+        self.assertIn("overlay", d)
+        ov = d["overlay"]
+        self.assertIn("cells", ov)
+        self.assertIn("base_score", ov)
+        self.assertGreaterEqual(ov["n_cells"], 1)
+        cell0 = ov["cells"][0]
+        self.assertIn("exposure", cell0)
+        self.assertIn("ilat", cell0)
+
     def test_index_and_static(self):
         with urllib.request.urlopen(self.base + "/", timeout=5) as r:
             self.assertEqual(r.status, 200)

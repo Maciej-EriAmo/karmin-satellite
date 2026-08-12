@@ -60,13 +60,33 @@ python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --op
 | `GET /api/snapshots` | lista snapshotów (Library w UI) |
 | `POST /api/snapshot/save` · `load` | Save / Load frame → 2D/3D redraw |
 | `GET /api/analyze` | metryki density (cells, Σ, max, p50/p90, top) |
+| `GET /api/weather` | public NOAA SWPC (F10.7, X-ray/flare, Kp) · `?offline=1` stub/cache |
+| `GET /api/hazard` | solar hazard proxy: global + per shell · research only |
+| `GET /api/hazard?grid=1` | + 2D exposure overlay cells (`shell`, `min_count`) |
 | `POST /api/rpc/push` · `pull` | most Cynober DB (opcjonalny) |
 
 stdlib only (no Flask). Quality notes: `docs/CODE_REVIEW.md`.
 
 **Studio workflow (process + visualize):** live map → filter shell/min → 2D/3D →
-**Save** frame → **Library → Load** (redraw) → **Analyze** panel → optional **Push DB**.
+**Save** frame → **Library → Load** (redraw) → **Analyze** → **Solar weather / shell hazard** → optional **Push DB**.
 Snapshots are working frames, not archive-only dumps.
+
+### Space weather & hazard (public research)
+
+Public **NOAA SWPC** indices only (no private ops data). Scores are **research proxies**, not mission certification.
+
+```bat
+:: weather only (no map build)
+python main.py --weather
+python main.py --weather --weather-offline
+:: map + hazard per shell
+python main.py --offline-demo --limit 40 --hazard --no-heatmap
+```
+
+Code: `adapters/space_weather.py` · `engine/hazard.py`.  
+Docs: [`docs/HAZARD_LAYER.md`](docs/HAZARD_LAYER.md) · roadmap in [`docs/CYNOBER_STUDIO_VERIFIED_PLAN.md`](docs/CYNOBER_STUDIO_VERIFIED_PLAN.md) §4b.  
+UI: header badges + Solar weather panel + shell hazard list + **2D layers** Density / Hazard / Blend.  
+**Next:** H3 predict · H4 report. **Later:** H6 radiation intensity on **3D globe**; H7 multi-fleet open catalogs.
 
 ### Snapshots (Faza 5)
 

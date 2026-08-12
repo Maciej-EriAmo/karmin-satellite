@@ -450,7 +450,9 @@ DONE WHEN:
 |------|-----------|---------|
 | **TOR A — design against 50k SLA** | **DONE 2026-08-11** | `docs/SLA_50K.md` · `engine/sla.py` · `/api/sla` · capacity hard gates |
 | **Most RPC → żywy Cynober DB** | **DONE (optional)** | `adapters/cynober_rpc.py` · `--rpc-push/pull/health` · `/api/rpc/*` · density-first |
-| Narzędzia analityczne (analytics) | later | po SLA / nie blokuja toru A |
+| **Studio library/analyze/viz** | **DONE 2026-08-11** | Library load, Analyze, process+viz workflow |
+| **Hazard H0+H1+H2** | **DONE 2026-08-12** | NOAA weather + shell hazard + 2D overlay (Density/Hazard/Blend) |
+| Narzędzia analityczne (analytics deeper) | later | po hazard; charty, batch snap×states |
 | Pełniejszy EN w UI | later | SLA docs już PL+EN |
 | Soak 30 min live-feed (ops) | LOW | unit feeder OK |
 | Delta JSON / ETag | LOW | version poll wystarcza na MVP |
@@ -461,6 +463,41 @@ DONE WHEN:
 | Public repo | — | stays **PRIVATE** |
 
 **Polish done after Faza 5:** rebrand HTML export, UI Save snapshot, docs paths → cynober_studio.
+
+---
+
+## 4b. Product mission (research workbench)
+
+**Cynober Studio** = kompletne **narzędzie badawcze dla pasjonatów** publicznego nieba:
+
+- mapa / obróbka / snapshoty (density SoT, shells, 2D/3D)
+- publiczna pogoda kosmiczna (NOAA SWPC) + hazard grup
+- później: multi-fleet z open catalogs (NASA TLE, Celestrak SATCAT…), raporty, predykcja
+
+**Zasada:** tylko dane publiczne; proxy badawcze ≠ certyfikat misji / ops.
+
+### Tor Hazard / solar (post-MVP)
+
+| Krok | Status | Deliverable |
+|------|--------|-------------|
+| **H0** weather adapter | **DONE 2026-08-12** | `adapters/space_weather.py` · F10.7, X-ray/flare, Kp · cache/stub · `GET /api/weather` · CLI `--weather` |
+| **H1** hazard groups | **DONE 2026-08-12** | `engine/hazard.py` · score + INFO/WATCH/WARNING · per shell · `GET /api/hazard` · UI badge/panel |
+| **H2** 2D overlay | **DONE 2026-08-12** | layers Density/Hazard/Blend · exposure = score×density weight · `?grid=1` · tooltip |
+| **H3** predict | **NEXT** | horyzonty 1h/6h/24h z public indices + opc. forward prop; API/CLI |
+| **H4** hazard report | **NEXT+1** | JSON/MD raport grupy · Save w snapshot meta · CLI `--hazard-report` |
+| **H5** alt-band / sunlit | later | pasy wysokości + day/night fraction |
+| **H6** 3D radiation intensity | **later (explicit)** | warstwa natężenia na globe quads (TODO w `ui/static/globe.js`) |
+| **H7** multi-fleet catalogs | later | `CatalogProvider` · Starlink first · NASA TLE / Celestrak groups / country filter (public only) |
+
+### Co następne (kolejność commitów)
+
+```
+1. H3  predict horizons (public SWPC trends + optional prop minutes)
+2. H4  HazardReport JSON/MD + snapshot weather/hazard meta
+3. H6  3D radiation intensity on globe (after H3/H4 solid)
+4. H5  alt-band / sunlit polish
+5. H7  multi-fleet open catalogs (post-Starlink research expansion)
+```
 
 ---
 
@@ -506,13 +543,27 @@ cynober_studio/                    # teraz
 ## 7. Kolejność pracy (najbliższe commity)
 
 ```
-1. [docs]  ten plik = kanon planu                              ← DONE (ten dokument)
+MVP 0–5 + SLA + RPC + library/analyze     ← DONE
+H0–H2 space weather + 2D hazard overlay   ← DONE 2026-08-12
+
+NEXT:
+1. [H3]  predict 1h/6h/24h (public indices)
+2. [H4]  hazard report JSON/MD + snapshot meta
+3. [H6]  3D radiation intensity on globe
+4. [H5]  alt-band / sunlit
+5. [H7]  multi-fleet open catalogs (NASA/Celestrak public)
+```
+
+Historyczne (ukończone):
+
+```
+1. [docs]  ten plik = kanon planu
 2. [test]  bench + density↔cells consistency
 3. [engine] RLock + version + snapshot + sat GC + shell_index + filter
-4. [ui]    minimal FastAPI/Flask or stdlib http.server + 2D page
+4. [ui]    stdlib http.server + 2D page
 5. [feed]  live feeder + stop
-6. [3d]    optional sphere export
-7. [db]    Cynober DB adapter
+6. [3d]    sphere export
+7. [db]    snapshot store + optional Cynober RPC
 ```
 
 ---

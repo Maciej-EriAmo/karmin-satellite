@@ -13,6 +13,9 @@ Cynober Studio HTTP server (stdlib only).
   GET  /api/feeder    → live feeder status
   POST /api/feeder/stop → stop feeder
   GET  /api/sphere    → S2b sphere quads (3D)
+  GET  /api/weather   → public NOAA SWPC space weather (F10.7, X-ray, Kp)
+  GET  /api/hazard    → solar hazard proxy global + per shell
+                      · ?grid=1&shell=&min_count= → 2D exposure overlay cells
 """
 from __future__ import annotations
 
@@ -311,6 +314,62 @@ def create_handler(state: StudioState):
                     self,
                     200,
                     {"status": "ok", "data": filtered},
+                )
+                return
+            if path == "/api/weather":
+                from adapters.space_weather import get_space_weather
+
+                force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
+                offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
+                snap = get_space_weather(force=force, offline=offline)
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": snap.as_dict()},
+                )
+                return
+            if path == "/api/hazard":
+                from adapters.space_weather import get_space_weather
+                from engine.hazard import (
+                    assess_from_amap,
+                    build_overlay,
+                    short_badge,
+                )
+
+                force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
+                offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
+                want_grid = (qs.get("grid") or ["0"])[0] in ("1", "true", "yes")
+                shell = (qs.get("shell") or ["all"])[0]
+                try:
+                    min_count = int((qs.get("min_count") or ["1"])[0])
+                except ValueError:
+                    min_count = 1
+                weather = get_space_weather(force=force, offline=offline)
+                assessment = assess_from_amap(state.amap, weather)
+                payload = assessment.as_dict()
+                payload["badge"] = short_badge(assessment)
+                if want_grid:
+                    if shell not in ("all", "*", ""):
+                        dens_src = state.amap.filter_density(
+                            shell=shell, min_count=min_count
+                        )
+                        dens = dens_src.get("density") or []
+                    else:
+                        dens = [
+                            {"ilat": k[0], "ilon": k[1], "count": int(v)}
+                            for k, v in (state.amap.density or {}).items()
+                            if int(v) >= min_count
+                        ]
+                    payload["overlay"] = build_overlay(
+                        assessment,
+                        dens,
+                        shell=shell,
+                        min_count=min_count,
+                    )
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": payload},
                 )
                 return
             if path == "/api/feeder":

@@ -55,6 +55,30 @@ header .sub {
 }
 
 .badge.ok { color: var(--ok); border-color: #1a3a28; background: #122018; }
+.badge.warn { color: #f0c040; border-color: #5a4820; background: #2a2410; }
+.badge.danger { color: #ff6a4a; border-color: #5a2018; background: #2a1010; }
+.header-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; justify-content: flex-end; max-width: 58%; }
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0.55rem;
+}
+.leg-swatch {
+  display: inline-block;
+  width: 1.4rem;
+  height: 0.65rem;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+}
+.leg-swatch.dens {
+  background: linear-gradient(90deg, #003050, #ffcc00, #ff3b1f);
+}
+.leg-swatch.haz {
+  background: linear-gradient(90deg, #1a1040, #c040ff, #ff2040);
+}
 
 main {
   display: grid;
