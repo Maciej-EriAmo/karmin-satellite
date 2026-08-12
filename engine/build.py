@@ -18,7 +18,7 @@ from engine.constants import (
     DEFAULT_LIMIT,
 )
 from engine.map import StarlinkAtomMap
-from engine.tle import TleSat, build_demo_catalog, load_tle_text, parse_tle_catalog
+from engine.tle import TleSat, build_demo_catalog, load_catalog
 
 
 def build_map(
@@ -35,6 +35,7 @@ def build_map(
     arch_cap: bool = True,
     catalog: List[TleSat] | None = None,
     src: str | None = None,
+    fleet: str = "starlink",
 ) -> Tuple[Any, StarlinkAtomMap, List[TleSat], str]:
     """API do seedowania Store (boot / tool / testy).
 
@@ -43,6 +44,7 @@ def build_map(
       N → pierwsze N wpisów
     arch_cap=True: twardy sufit ARCH_CEILING_SATS (100_000).
     catalog=...: gotowa lista (capacity tests); pomija fetch/parse.
+    fleet: H7 — id floty lub lista ``starlink,oneweb``.
     """
     if backend and backend != "default":
         os.environ["KARMAZYN_SUBSTRATE"] = backend
@@ -51,12 +53,22 @@ def build_map(
         full = list(catalog)
         src_s = src or "catalog:injected"
     else:
-        raw, src_s = load_tle_text(
+        from engine.catalogs import parse_fleet_list
+
+        fleet_ids = parse_fleet_list(fleet)
+        multi = len(fleet_ids) > 1
+        # multi-fleet: split limit across fleets so merge is not first-fleet-only
+        per = None
+        if multi and limit and limit > 0:
+            per = max(1, int(limit) // len(fleet_ids))
+        full, src_s = load_catalog(
+            fleet=fleet,
             offline_demo=offline_demo,
-            cache=Path(cache),
+            cache=Path(cache) if not multi else None,
+            cache_dir=Path(cache).parent if cache else Path("out"),
             limit_hint=limit or 12,
+            per_fleet_limit=per,
         )
-        full = parse_tle_catalog(raw)
 
     use = full if limit == 0 else full[:limit]
     if arch_cap and len(use) > ARCH_CEILING_SATS:

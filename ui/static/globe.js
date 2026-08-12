@@ -1,8 +1,7 @@
-/* Cynober Studio — S2b 3D globe (Three.js CDN)
+/* Cynober Studio — S2b / H6 3D globe (Three.js CDN)
  *
- * TODO (later): solar radiation intensity layer on globe quads
- * (same exposure proxy as 2D hazard, or X-ray/F10.7-driven tint).
- * Do not block 2D H2 work — density quads only for now.
+ * Layers: density | radiation (H6 intensity) | blend
+ * Radiation = solar score × density weight (same proxy as 2D hazard).
  */
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -12,6 +11,7 @@
     scene: null,
     camera: null,
     earth: null,
+    wire: null,
     cellGroup: null,
     anim: null,
     ro: null,
@@ -19,6 +19,7 @@
     lastX: 0,
     lastY: 0,
     version: -1,
+    layer: "density", // density | radiation | blend
   };
 
   function ensureThree(cb) {
@@ -36,18 +37,30 @@
     document.head.appendChild(s);
   }
 
+  function hostSize() {
+    const host = $("globe-host");
+    const wrap = $("globe-wrap") || host;
+    const w = Math.max(480, (wrap && wrap.clientWidth) || host?.clientWidth || 960);
+    // fill the enlarged viz frame (CSS sets min ~62vh)
+    const h = Math.max(
+      480,
+      (wrap && wrap.clientHeight) || host?.clientHeight || Math.floor(w * 0.72)
+    );
+    return { w, h };
+  }
+
   function initScene() {
     const host = $("globe-host");
     if (!host || G.renderer) return;
-    const w = host.clientWidth || 720;
-    const h = Math.max(360, Math.floor(w * 0.55));
+    const { w, h } = hostSize();
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x08060a);
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 100);
-    camera.position.set(0, 0.35, 2.6);
+    const camera = new THREE.PerspectiveCamera(42, w / h, 0.01, 100);
+    // slightly closer so Earth fills the larger frame
+    camera.position.set(0, 0.28, 2.15);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(w, h);
+    renderer.setSize(w, h, false);
     host.innerHTML = "";
     host.appendChild(renderer.domElement);
 
@@ -67,7 +80,6 @@
     );
     scene.add(earth);
 
-    // wireframe outline
     const wire = new THREE.Mesh(
       new THREE.SphereGeometry(0.985, 32, 24),
       new THREE.MeshBasicMaterial({
@@ -86,9 +98,9 @@
     G.scene = scene;
     G.camera = camera;
     G.earth = earth;
+    G.wire = wire;
     G.cellGroup = cellGroup;
 
-    // drag rotate
     const el = renderer.domElement;
     el.style.cursor = "grab";
     el.addEventListener("pointerdown", (e) => {
@@ -98,7 +110,7 @@
       el.setPointerCapture(e.pointerId);
       el.style.cursor = "grabbing";
     });
-    el.addEventListener("pointerup", (e) => {
+    el.addEventListener("pointerup", () => {
       G.dragging = false;
       el.style.cursor = "grab";
     });
@@ -131,13 +143,18 @@
     );
 
     function onResize() {
-      const ww = host.clientWidth || 720;
-      const hh = Math.max(360, Math.floor(ww * 0.55));
+      const { w: ww, h: hh } = hostSize();
       camera.aspect = ww / hh;
       camera.updateProjectionMatrix();
-      renderer.setSize(ww, hh);
+      renderer.setSize(ww, hh, false);
     }
     window.addEventListener("resize", onResize);
+    // ResizeObserver: viz-wrap grows after layout / mode switch
+    if (typeof ResizeObserver !== "undefined") {
+      const wrap = $("globe-wrap") || host;
+      G.ro = new ResizeObserver(() => onResize());
+      G.ro.observe(wrap);
+    }
 
     function animate() {
       G.anim = requestAnimationFrame(animate);
@@ -152,10 +169,28 @@
   }
 
   function parseColor(css) {
-    // rgb(r,g,b)
     const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(css || "");
     if (!m) return 0xb01030;
-    return (parseInt(m[1]) << 16) + (parseInt(m[2]) << 8) + parseInt(m[3]);
+    return (parseInt(m[1], 10) << 16) + (parseInt(m[2], 10) << 8) + parseInt(m[3], 10);
+  }
+
+  function setLayer(layer) {
+    const L = layer || "density";
+    G.layer = L === "hazard" || L === "intensity" ? "radiation" : L;
+    ["density", "radiation", "blend"].forEach((id) => {
+      const btn = $(`btn-globe-${id}`);
+      if (btn) btn.classList.toggle("primary", id === G.layer);
+    });
+    const info = $("globe-layer-info");
+    if (info) {
+      const labels = {
+        density: "density thermal",
+        radiation: "solar radiation intensity (proxy)",
+        blend: "density + radiation blend",
+      };
+      info.textContent = labels[G.layer] || G.layer;
+    }
+    refresh();
   }
 
   function loadCells(data) {
@@ -166,10 +201,10 @@
       if (c.material) c.material.dispose();
     }
     const cells = data.cells || [];
+    const layer = data.layer || G.layer || "density";
     for (const cell of cells) {
       const q = cell.quad;
       if (!q || q.length < 4) continue;
-      // two triangles: 0-1-2 and 0-2-3
       const positions = new Float32Array([
         q[0][0], q[0][1], q[0][2],
         q[1][0], q[1][1], q[1][2],
@@ -181,24 +216,73 @@
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
       geo.computeVertexNormals();
+      const op =
+        cell.opacity != null
+          ? Number(cell.opacity)
+          : layer === "radiation"
+            ? 0.75
+            : 0.85;
       const mat = new THREE.MeshBasicMaterial({
         color: parseColor(cell.color),
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.85,
+        opacity: Math.max(0.2, Math.min(1, op)),
+        depthWrite: false,
       });
       G.cellGroup.add(new THREE.Mesh(geo, mat));
     }
     G.version = data.version || 0;
     const meta = data.meta || {};
+    const solar = data.solar || {};
     const el = $("globe-meta");
     if (el) {
-      el.textContent = `cells ${meta.count_cells ?? cells.length} · v${G.version}`;
+      const parts = [
+        `cells ${meta.count_cells ?? cells.length}`,
+        `v${G.version}`,
+        layer,
+      ];
+      if (solar.base_score != null) {
+        parts.push(`stress ${Number(solar.base_score).toFixed(0)}`);
+      }
+      if (solar.max_exposure != null && layer !== "density") {
+        parts.push(`max exp ${Number(solar.max_exposure).toFixed(0)}`);
+      }
+      el.textContent = parts.join(" · ");
+    }
+    // soft ambient tint on earth for radiation layers
+    if (G.earth && G.earth.material) {
+      if (layer === "radiation") {
+        G.earth.material.emissive = new THREE.Color(0x1a0520);
+        G.earth.material.color = new THREE.Color(0x0c1028);
+      } else if (layer === "blend") {
+        G.earth.material.emissive = new THREE.Color(0x100818);
+        G.earth.material.color = new THREE.Color(0x0a1840);
+      } else {
+        G.earth.material.emissive = new THREE.Color(0x050812);
+        G.earth.material.color = new THREE.Color(0x0a1840);
+      }
     }
   }
 
+  function sphereQuery() {
+    const params = new URLSearchParams();
+    params.set("layer", G.layer || "density");
+    // reuse 2D filter state when available
+    try {
+      if (window.CynoberStudioState) {
+        const st = window.CynoberStudioState;
+        if (st.shell && st.shell !== "all") params.set("shell", st.shell);
+        if (st.minCount) params.set("min_count", String(st.minCount));
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return params.toString();
+  }
+
   async function fetchSphere() {
-    const resp = await fetch("/api/sphere");
+    const q = sphereQuery();
+    const resp = await fetch(`/api/sphere?${q}`);
     const j = await resp.json();
     if (j.status === "error") throw new Error(j.message || "sphere failed");
     return j.data;
@@ -209,6 +293,7 @@
       initScene();
       try {
         const data = await fetchSphere();
+        if (data.layer) G.layer = data.layer;
         loadCells(data);
         const err = $("err");
         if (err) err.textContent = "";
@@ -224,8 +309,39 @@
     const h = $("panel-heatmap");
     if (g) g.style.display = on ? "" : "none";
     if (h) h.style.display = on ? "none" : "";
-    if (on) refresh();
+    if (on) {
+      // sync 2D hazard → 3D radiation when user was on hazard layer
+      try {
+        if (window.CynoberStudioState && window.CynoberStudioState.layer === "hazard") {
+          G.layer = "radiation";
+        } else if (
+          window.CynoberStudioState &&
+          window.CynoberStudioState.layer === "blend"
+        ) {
+          G.layer = "blend";
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      // wait one frame so enlarged panel has real clientWidth/Height
+      requestAnimationFrame(() => {
+        setLayer(G.layer);
+        window.dispatchEvent(new Event("resize"));
+      });
+    }
   }
 
-  window.CynoberGlobe = { show, refresh, loadCells };
+  function wireGlobeLayers() {
+    $("btn-globe-density")?.addEventListener("click", () => setLayer("density"));
+    $("btn-globe-radiation")?.addEventListener("click", () => setLayer("radiation"));
+    $("btn-globe-blend")?.addEventListener("click", () => setLayer("blend"));
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wireGlobeLayers);
+  } else {
+    wireGlobeLayers();
+  }
+
+  window.CynoberGlobe = { show, refresh, loadCells, setLayer, getLayer: () => G.layer };
 })();

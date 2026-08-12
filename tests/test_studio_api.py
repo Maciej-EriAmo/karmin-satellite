@@ -125,6 +125,43 @@ class TestStudioAPI(unittest.TestCase):
         self.assertIn("exposure", cell0)
         self.assertIn("ilat", cell0)
 
+    def test_predict_horizons(self):
+        st, j = self._get("/api/predict?offline=1")
+        self.assertEqual(st, 200)
+        d = j["data"]
+        self.assertEqual(d["version"], "predict-v1")
+        self.assertIn("horizons", d)
+        self.assertEqual(len(d["horizons"]), 3)
+        self.assertIn("badge", d)
+        labels = [h["label"] for h in d["horizons"]]
+        self.assertEqual(labels, ["1h", "6h", "24h"])
+        for h in d["horizons"]:
+            self.assertIn("global_score", h)
+            self.assertIn("severity", h)
+            self.assertIn("flare_class", h)
+
+    def test_report_h4(self):
+        st, j = self._get("/api/report?offline=1&md=1")
+        self.assertEqual(st, 200)
+        d = j["data"]
+        self.assertEqual(d["version"], "hazard-report-v1")
+        self.assertIn("groups", d)
+        self.assertIn("weather", d)
+        self.assertIn("markdown", d)
+        self.assertIn("# Cynober", d["markdown"])
+        self.assertIn("solar", d)
+        self.assertIn("hazard", d["solar"])
+
+    def test_geo_h5(self):
+        st, j = self._get("/api/geo")
+        self.assertEqual(st, 200)
+        d = j["data"]
+        self.assertEqual(d["version"], "geo-v1")
+        self.assertIn("sunlit_frac", d)
+        self.assertIn("bands", d)
+        self.assertIn("badge", d)
+        self.assertGreater(d["n_with_pos"], 0)
+
     def test_index_and_static(self):
         with urllib.request.urlopen(self.base + "/", timeout=5) as r:
             self.assertEqual(r.status, 200)

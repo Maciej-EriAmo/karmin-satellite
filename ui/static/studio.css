@@ -79,18 +79,27 @@ header .sub {
 .leg-swatch.haz {
   background: linear-gradient(90deg, #1a1040, #c040ff, #ff2040);
 }
+.leg-swatch.aura {
+  background: radial-gradient(circle, transparent 20%, #a02050 70%, #ff2848 100%);
+}
 
 main {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
   gap: 1rem;
-  padding: 1rem;
-  max-width: 1400px;
+  padding: 0.85rem 1rem 1rem;
+  max-width: min(1760px, 100%);
   margin: 0 auto;
+  align-items: start;
 }
 
 @media (max-width: 900px) {
   main { grid-template-columns: 1fr; }
+}
+
+/* visualization column: give Earth / map most of the page */
+.panel-viz {
+  min-width: 0;
 }
 
 .panel {
@@ -176,9 +185,83 @@ button.primary {
 .viz-wrap {
   position: relative;
   background: #08060a;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   overflow: hidden;
+  /* solar edge aura (H8) — intensity via --aura-strength 0..1 */
+  --aura-strength: 0.42;
+  --aura-rgb: 160, 24, 64;
+}
+
+.viz-map {
+  min-height: 280px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* map keeps intrinsic pixel size; do not force-stretch */
+}
+
+.viz-globe {
+  min-height: clamp(520px, 62vh, 820px);
+  height: clamp(520px, 62vh, 820px);
+}
+
+.globe-host {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.globe-host canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  cursor: grab;
+  image-rendering: auto;
+}
+
+/* Vignette / radiation fog on frame edge — not on density pixels */
+.edge-aura {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  opacity: 1;
+  /* outer rim glow + soft inner fog */
+  box-shadow:
+    inset 0 0 calc(28px + 48px * var(--aura-strength))
+      rgba(var(--aura-rgb), calc(0.25 + 0.55 * var(--aura-strength))),
+    inset 0 0 calc(12px + 20px * var(--aura-strength))
+      rgba(255, 80, 60, calc(0.08 + 0.35 * var(--aura-strength))),
+    0 0 calc(10px + 18px * var(--aura-strength))
+      rgba(var(--aura-rgb), calc(0.15 + 0.4 * var(--aura-strength)));
+  background:
+    radial-gradient(
+      ellipse 72% 68% at 50% 50%,
+      transparent 0%,
+      transparent calc(42% - 18% * var(--aura-strength)),
+      rgba(var(--aura-rgb), calc(0.12 + 0.38 * var(--aura-strength))) 78%,
+      rgba(var(--aura-rgb), calc(0.28 + 0.52 * var(--aura-strength))) 100%
+    );
+  mix-blend-mode: screen;
+  transition: box-shadow 0.45s ease, background 0.45s ease, opacity 0.35s ease;
+}
+
+.edge-aura[data-severity="INFO"] {
+  --aura-rgb: 90, 50, 120;
+}
+.edge-aura[data-severity="WATCH"] {
+  --aura-rgb: 200, 60, 40;
+}
+.edge-aura[data-severity="WARNING"] {
+  --aura-rgb: 255, 40, 30;
+}
+
+.viz-wrap:hover .edge-aura {
+  /* keep aura readable on hover */
+  opacity: 1;
 }
 
 .snap-list {
@@ -236,12 +319,27 @@ button.primary {
 
 .an-top b { color: var(--warm); font-variant-numeric: tabular-nums; }
 
-canvas {
+/* Heatmap: size set in JS (1:1 CSS px). No width:100% — that blurred the map. */
+#heatmap {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: auto;
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
   cursor: crosshair;
+  margin: 0 auto;
+}
+
+canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+#map-px-info {
+  margin-top: 0.25rem;
+  color: var(--warm);
+  font-variant-numeric: tabular-nums;
 }
 
 .tooltip {
@@ -261,7 +359,7 @@ canvas {
 .tooltip.show { display: block; }
 
 footer {
-  max-width: 1400px;
+  max-width: min(1760px, 100%);
   margin: 0 auto;
   padding: 0 1rem 1.5rem;
   color: var(--muted);

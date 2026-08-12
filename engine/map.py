@@ -111,6 +111,7 @@ class StarlinkAtomMap:
                 "tle2": sat.line2,
                 "inc": sat.inclination_deg,
                 "shell": sat.shell_key,
+                "fleet": getattr(sat, "fleet", None) or "starlink",
                 "kind": "sat",
                 "prop": self.prop_mode,
             }
@@ -496,6 +497,11 @@ class StarlinkAtomMap:
         err_rate = (
             (self.last_error_sats / len(sats)) if sats else 0.0
         )
+        fleets: Dict[str, int] = {}
+        for a in sats:
+            v = dict(a.metadata.get("v") or {})
+            fk = str(v.get("fleet") or "starlink")
+            fleets[fk] = fleets.get(fk, 0) + 1
         return {
             "sats": len(sats),
             "cells": len(cells),
@@ -505,6 +511,7 @@ class StarlinkAtomMap:
             "prop": self.prop_mode,
             "sgp4": _HAS_SGP4,
             "shells": dict(self._shells),
+            "fleets": fleets,
             "state_changes": self.state_changes,
             "prop_ms": self.last_prop_ms,
             "prop_errors": self.last_error_sats,

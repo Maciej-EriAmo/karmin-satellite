@@ -13,9 +13,14 @@ Cynober Studio HTTP server (stdlib only).
   GET  /api/feeder    → live feeder status
   POST /api/feeder/stop → stop feeder
   GET  /api/sphere    → S2b sphere quads (3D)
-  GET  /api/weather   → public NOAA SWPC space weather (F10.7, X-ray, Kp)
+  GET  /api/weather   → public NOAA SWPC (engine.solar)
   GET  /api/hazard    → solar hazard proxy global + per shell
                       · ?grid=1&shell=&min_count= → 2D exposure overlay cells
+  GET  /api/predict   → H3 horizon forecasts 1h/6h/24h (engine.solar.predict)
+  GET  /api/report    → H4 HazardReport JSON (+ ?md=1 Markdown body)
+  GET  /api/geo       → H5 altitude bands + sunlit fraction
+  GET  /api/fleets    → H7 public catalog list
+  POST /api/fleet     → {fleet} switch catalog (rebuild map)
 """
 from __future__ import annotations
 
@@ -57,6 +62,7 @@ class StudioState:
     offline_demo: bool = False
     cache: str = "out/starlink_tle_cache.txt"
     cache_ttl_hours: float = 12.0
+    fleet: str = "starlink"  # H7: id or starlink,oneweb
     meta: dict = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
     feeder: Any = None  # Optional[LiveFeeder]
@@ -73,15 +79,16 @@ class StudioState:
         """Refresh positions; optionally re-fetch / re-parse TLE text."""
         with self.lock:
             if reload_tle:
-                from engine.starlink_atoms import load_tle_text, parse_tle_catalog
+                from engine.tle import load_catalog
 
-                raw, src = load_tle_text(
+                catalog, src = load_catalog(
+                    fleet=self.fleet or "starlink",
                     offline_demo=self.offline_demo,
                     cache=Path(self.cache),
+                    cache_dir=Path(self.cache).parent if self.cache else Path("out"),
                     limit_hint=self.limit or self.using or 12,
                     cache_ttl_hours=self.cache_ttl_hours,
                 )
-                catalog = parse_tle_catalog(raw)
                 if self.limit and self.limit > 0:
                     catalog = catalog[: self.limit]
                 self.catalog = catalog
@@ -287,6 +294,7 @@ def create_handler(state: StudioState):
                         "tle_source": state.src,
                         "using": state.using,
                         "limit": state.limit,
+                        "fleet": state.fleet,
                         "project": "Cynober Studio",
                         "feeder": feeder_st,
                         "design_sats": SLA_USABLE_SATS,
@@ -317,7 +325,7 @@ def create_handler(state: StudioState):
                 )
                 return
             if path == "/api/weather":
-                from adapters.space_weather import get_space_weather
+                from engine.solar import get_space_weather
 
                 force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
                 offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
@@ -329,10 +337,10 @@ def create_handler(state: StudioState):
                 )
                 return
             if path == "/api/hazard":
-                from adapters.space_weather import get_space_weather
-                from engine.hazard import (
+                from engine.solar import (
                     assess_from_amap,
                     build_overlay,
+                    get_space_weather,
                     short_badge,
                 )
 
@@ -372,6 +380,66 @@ def create_handler(state: StudioState):
                     {"status": "ok", "data": payload},
                 )
                 return
+            if path == "/api/predict":
+                from engine.solar import (
+                    get_space_weather_bundle,
+                    predict_horizons,
+                    short_horizon_line,
+                )
+
+                force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
+                offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
+                prop_raw = (qs.get("prop_minutes") or qs.get("minutes") or [None])[0]
+                prop_minutes = None
+                if prop_raw not in (None, ""):
+                    try:
+                        prop_minutes = float(prop_raw)
+                    except ValueError:
+                        prop_minutes = None
+                weather, series = get_space_weather_bundle(
+                    force=force, offline=offline
+                )
+                pred = predict_horizons(
+                    weather,
+                    series=series,
+                    prop_minutes=prop_minutes,
+                )
+                payload = pred.as_dict()
+                payload["badge"] = short_horizon_line(pred)
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": payload},
+                )
+                return
+            if path == "/api/report":
+                from engine.solar import collect_solar_for_map
+
+                force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
+                offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
+                with_predict = (qs.get("predict") or ["1"])[0] not in (
+                    "0",
+                    "false",
+                    "no",
+                )
+                want_md = (qs.get("md") or ["0"])[0] in ("1", "true", "yes")
+                report = collect_solar_for_map(
+                    state.amap,
+                    force=force,
+                    offline=offline,
+                    with_predict=with_predict,
+                    src=state.src,
+                )
+                data = report.as_dict()
+                if want_md:
+                    data["markdown"] = report.as_markdown()
+                data["solar"] = report.solar_meta()
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": data},
+                )
+                return
             if path == "/api/feeder":
                 if state.feeder is None:
                     _json_response(
@@ -392,7 +460,39 @@ def create_handler(state: StudioState):
             if path == "/api/sphere":
                 from transform.sphere import export_sphere_data
 
-                data = export_sphere_data(state.amap)
+                layer = (qs.get("layer") or ["density"])[0]
+                shell = (qs.get("shell") or ["all"])[0]
+                try:
+                    min_count = int((qs.get("min_count") or ["1"])[0])
+                except ValueError:
+                    min_count = 1
+                force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
+                offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
+                assessment = None
+                layer_l = (layer or "density").lower()
+                if layer_l in (
+                    "radiation",
+                    "intensity",
+                    "hazard",
+                    "blend",
+                    "rad",
+                    "solar",
+                ):
+                    try:
+                        from engine.solar import assess_from_amap, get_space_weather
+
+                        wx = get_space_weather(force=force, offline=offline)
+                        assessment = assess_from_amap(state.amap, wx)
+                    except Exception as e:
+                        log.warning("sphere solar: %s", e)
+                        assessment = None
+                data = export_sphere_data(
+                    state.amap,
+                    layer=layer,
+                    assessment=assessment,
+                    shell=shell,
+                    min_count=min_count,
+                )
                 data["tle_source"] = state.src
                 data["using"] = state.using
                 data["project"] = "Cynober Studio"
@@ -437,23 +537,51 @@ def create_handler(state: StudioState):
                     return int(counts[i])
 
                 summ = state.amap.summary()
+                payload = {
+                    "cells": len(counts),
+                    "sum_count": total,
+                    "max_count": max_c,
+                    "hotspot": hot,
+                    "p50": _pct(50),
+                    "p90": _pct(90),
+                    "top_cells": top,
+                    "shells": summ.get("shells") or {},
+                    "version": summ.get("version"),
+                    "src": state.src,
+                    "using": state.using,
+                }
+                # H5: attach geo summary when positions available
+                if (qs.get("geo") or ["1"])[0] not in ("0", "false", "no"):
+                    try:
+                        from engine.solar import assess_geo_from_amap, short_geo_line
+
+                        geo = assess_geo_from_amap(state.amap)
+                        payload["geo"] = geo.as_dict()
+                        payload["geo_badge"] = short_geo_line(geo)
+                    except Exception as e:
+                        log.warning("analyze geo: %s", e)
+                _json_response(self, 200, {"status": "ok", "data": payload})
+                return
+            if path == "/api/geo":
+                from engine.solar import assess_geo_from_amap, short_geo_line
+
+                geo = assess_geo_from_amap(state.amap)
+                data = geo.as_dict()
+                data["badge"] = short_geo_line(geo)
+                _json_response(self, 200, {"status": "ok", "data": data})
+                return
+            if path == "/api/fleets":
+                from engine.catalogs import list_fleets, parse_fleet_list
+
                 _json_response(
                     self,
                     200,
                     {
                         "status": "ok",
                         "data": {
-                            "cells": len(counts),
-                            "sum_count": total,
-                            "max_count": max_c,
-                            "hotspot": hot,
-                            "p50": _pct(50),
-                            "p90": _pct(90),
-                            "top_cells": top,
-                            "shells": summ.get("shells") or {},
-                            "version": summ.get("version"),
-                            "src": state.src,
-                            "using": state.using,
+                            "fleets": list_fleets(),
+                            "current": state.fleet,
+                            "current_ids": parse_fleet_list(state.fleet),
                         },
                     },
                 )
@@ -535,6 +663,57 @@ def create_handler(state: StudioState):
                     200,
                     {"status": "ok", "data": info},
                 )
+                return
+            if path == "/api/fleet":
+                # H7: switch fleet and rebuild map from public catalog
+                body = _read_json_body(self)
+                fleet = str(body.get("fleet") or body.get("id") or "").strip()
+                if not fleet:
+                    _json_response(
+                        self,
+                        400,
+                        {"status": "error", "message": "fleet required"},
+                    )
+                    return
+                try:
+                    from engine.build import build_map
+
+                    limit = int(body.get("limit") if body.get("limit") is not None else state.limit)
+                    store, amap, use, src = build_map(
+                        limit=limit,
+                        hot_only=True,
+                        offline_demo=bool(state.offline_demo),
+                        cache=state.cache,
+                        backend="python",
+                        fleet=fleet,
+                    )
+                    state.amap = amap
+                    state.catalog = list(use)
+                    state.src = src
+                    state.using = len(use)
+                    state.limit = limit
+                    state.fleet = fleet
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "ok",
+                            "data": {
+                                "fleet": fleet,
+                                "src": src,
+                                "using": state.using,
+                                "limit": state.limit,
+                                "version": amap.get_export_version(),
+                                "summary": amap.summary(),
+                            },
+                        },
+                    )
+                except Exception as e:
+                    _json_response(
+                        self,
+                        502,
+                        {"status": "error", "message": str(e)},
+                    )
                 return
             if path == "/api/feeder/stop":
                 info = state.stop_feeder()
@@ -668,15 +847,34 @@ def create_handler(state: StudioState):
                     retention_days=state.snapshot_retention_days,
                 )
                 sid = body.get("snapshot_id") or body.get("id")
+                # H4: attach solar meta by default (opt-out: solar=false)
+                attach_solar = body.get("solar", True) not in (
+                    False,
+                    0,
+                    "0",
+                    "false",
+                    "no",
+                )
+                solar_offline = body.get("solar_offline", False) in (
+                    True,
+                    1,
+                    "1",
+                    "true",
+                    "yes",
+                )
                 meta = store.save(
                     state.amap,
                     snapshot_id=sid,
                     src=state.src,
                     using=state.using,
+                    attach_solar=bool(attach_solar),
+                    solar_offline=bool(solar_offline),
+                    solar_with_predict=body.get("predict", True)
+                    not in (False, 0, "0", "false", "no"),
                 )
-                _json_response(
-                    self, 200, {"status": "ok", "data": meta.as_dict()}
-                )
+                out = meta.as_dict()
+                out["solar_attached"] = bool(attach_solar)
+                _json_response(self, 200, {"status": "ok", "data": out})
                 return
             if path == "/api/snapshot/load":
                 from adapters.snapshot_store import SnapshotStore, load_snapshot_into_map

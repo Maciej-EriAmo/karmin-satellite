@@ -79,8 +79,14 @@ class SnapshotStore:
         using: int = 0,
         include_sats: bool = True,
         max_sats: int = 50_000,
+        solar: Optional[dict] = None,
+        extra: Optional[dict] = None,
     ) -> dict:
-        """Serialize map view for disk (density = SoT)."""
+        """Serialize map view for disk (density = SoT).
+
+        Optional ``solar`` = H4 weather/hazard/predict meta (research proxy).
+        Optional ``extra`` merged at top level (non-conflicting keys only).
+        """
         dens = [
             {"ilat": int(k[0]), "ilon": int(k[1]), "count": int(v)}
             for k, v in sorted(
@@ -113,7 +119,7 @@ class SnapshotStore:
         raw_for_hash = json.dumps(
             {"density": dens, "shells": shells}, sort_keys=True
         ).encode("utf-8")
-        return {
+        payload: Dict[str, Any] = {
             "format": "cynober-studio-snapshot-v1",
             "created_at": _utc_now().isoformat(),
             "src": src,
@@ -128,6 +134,14 @@ class SnapshotStore:
             "sats": sats_out,
             "catalog_hash": hashlib.sha256(raw_for_hash).hexdigest()[:16],
         }
+        if solar:
+            payload["solar"] = dict(solar)
+        if extra:
+            reserved = set(payload.keys()) | {"snapshot_id", "solar"}
+            for k, v in dict(extra).items():
+                if k not in reserved:
+                    payload[k] = v
+        return payload
 
     def save(
         self,
@@ -138,10 +152,40 @@ class SnapshotStore:
         using: int = 0,
         include_sats: bool = True,
         prune: bool = True,
+        solar: Optional[dict] = None,
+        extra: Optional[dict] = None,
+        attach_solar: bool = False,
+        solar_offline: bool = False,
+        solar_with_predict: bool = True,
     ) -> SnapshotMeta:
+        """
+        Write snapshot JSON.
+
+        H4: pass ``solar=`` meta dict, or ``attach_solar=True`` to collect
+        weather/hazard/predict from ``engine.solar`` at save time.
+        """
         sid = snapshot_id or self.make_id()
+        solar_block = solar
+        if solar_block is None and attach_solar:
+            try:
+                from engine.solar import collect_solar_for_map
+
+                report = collect_solar_for_map(
+                    amap,
+                    offline=bool(solar_offline),
+                    with_predict=bool(solar_with_predict),
+                    src=src,
+                )
+                solar_block = report.solar_meta()
+            except Exception:
+                solar_block = None
         payload = self.build_payload(
-            amap, src=src, using=using, include_sats=include_sats
+            amap,
+            src=src,
+            using=using,
+            include_sats=include_sats,
+            solar=solar_block,
+            extra=extra,
         )
         payload["snapshot_id"] = sid
         path = self._path(sid)

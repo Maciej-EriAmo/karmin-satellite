@@ -52,7 +52,7 @@ python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --op
 | `GET /api/version` | `{version, sla_version, design_sats}` |
 | `GET /api/sla` | kontrakt SLA 50k (machine-readable) |
 | `GET /api/data` | `snapshot()` + nlat/nlon + feeder (cells-scale) |
-| `GET /api/sphere` | S2b sphere quads (3D) |
+| `GET /api/sphere` | S2b/H6 sphere quads · `?layer=density\|radiation\|blend` |
 | `GET /api/filter?shell=&min_count=` | S4b |
 | `POST /api/refresh` | `{minutes, reload_tle}` |
 | `GET /api/feeder` | status live feedera |
@@ -63,6 +63,11 @@ python main.py --offline-demo --limit 40 --studio --live-feed --interval 30 --op
 | `GET /api/weather` | public NOAA SWPC (F10.7, X-ray/flare, Kp) · `?offline=1` stub/cache |
 | `GET /api/hazard` | solar hazard proxy: global + per shell · research only |
 | `GET /api/hazard?grid=1` | + 2D exposure overlay cells (`shell`, `min_count`) |
+| `GET /api/predict` | H3 horizons 1h/6h/24h (decay + short trend) · research only |
+| `GET /api/report` | H4 HazardReport JSON · `?md=1` + Markdown · snapshot-ready `solar` |
+| `GET /api/geo` | H5 altitude bands + sunlit fraction (geometric proxy) |
+| `GET /api/fleets` | H7 public Celestrak fleet list |
+| `POST /api/fleet` | H7 switch fleet `{fleet, limit?}` · rebuild map |
 | `POST /api/rpc/push` · `pull` | most Cynober DB (opcjonalny) |
 
 stdlib only (no Flask). Quality notes: `docs/CODE_REVIEW.md`.
@@ -75,18 +80,25 @@ Snapshots are working frames, not archive-only dumps.
 
 Public **NOAA SWPC** indices only (no private ops data). Scores are **research proxies**, not mission certification.
 
+Modules live **inside the engine**: `engine/solar/` (`weather` · `hazard` · `predict`).  
+CLI uses **subcommands** (not flag soup on the map command):
+
 ```bat
-:: weather only (no map build)
-python main.py --weather
-python main.py --weather --weather-offline
-:: map + hazard per shell
-python main.py --offline-demo --limit 40 --hazard --no-heatmap
+python main.py weather
+python main.py weather --offline
+python main.py predict
+python main.py predict --offline
+python main.py hazard --offline-demo --limit 40 --offline
+python main.py report --offline-demo --limit 40 --offline --json --md --save-snapshot
+python main.py geo --offline-demo --limit 40 --no-heatmap
+python main.py fleets
+python main.py --fleet oneweb --limit 200
+python main.py --fleet starlink,oneweb --limit 400 --offline-demo
+python main.py studio --fleet iridium --offline-demo --limit 40 --open-browser
 ```
 
-Code: `adapters/space_weather.py` · `engine/hazard.py`.  
 Docs: [`docs/HAZARD_LAYER.md`](docs/HAZARD_LAYER.md) · roadmap in [`docs/CYNOBER_STUDIO_VERIFIED_PLAN.md`](docs/CYNOBER_STUDIO_VERIFIED_PLAN.md) §4b.  
-UI: header badges + Solar weather panel + shell hazard list + **2D layers** Density / Hazard / Blend.  
-**Next:** H3 predict · H4 report. **Later:** H6 radiation intensity on **3D globe**; H7 multi-fleet open catalogs.
+UI: badges + weather + horizons + hazard + alt/sunlit + **fleet picker (H7)** + 2D/3D layers.
 
 ### Snapshots (Faza 5)
 

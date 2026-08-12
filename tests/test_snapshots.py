@@ -75,6 +75,37 @@ class TestSnapshots(unittest.TestCase):
             self.assertIn("fresh", ids)
             self.assertNotIn("ancient", ids)
 
+    def test_solar_meta_on_save(self):
+        """H4: snapshot payload carries solar weather/hazard block."""
+        from adapters.snapshot_store import SnapshotStore
+        from engine.build import build_map
+
+        _, amap, use, src = build_map(
+            limit=15,
+            hot_only=True,
+            offline_demo=True,
+            backend="python",
+            cache="out/starlink_tle_cache.txt",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            store = SnapshotStore(Path(td), retention_days=0)
+            meta = store.save(
+                amap,
+                snapshot_id="solar_snap",
+                src=src,
+                using=len(use),
+                attach_solar=True,
+                solar_offline=True,
+                prune=False,
+            )
+            payload = store.load_raw(meta.snapshot_id)
+            self.assertIn("solar", payload)
+            solar = payload["solar"]
+            self.assertIn("weather", solar)
+            self.assertIn("hazard", solar)
+            self.assertIn("global_score", solar["hazard"])
+            self.assertIn("predict", solar)
+
 
 if __name__ == "__main__":
     unittest.main()

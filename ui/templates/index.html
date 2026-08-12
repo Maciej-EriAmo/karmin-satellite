@@ -35,7 +35,15 @@
         <button type="button" id="btn-layer-blend" title="Density + hazard blend">Blend</button>
       </div>
       <div class="sub" id="layer-info">density · solar overlay off</div>
-      <p class="sub" style="margin:.35rem 0 0">3D radiation intensity layer — later</p>
+      <div class="sub" id="map-px-info" title="H8 adaptive cell size">cell px —</div>
+
+      <h2 style="margin-top:1rem">3D layer</h2>
+      <div class="btns" id="globe-layer-btns">
+        <button type="button" id="btn-globe-density" class="primary" title="Density thermal on globe">Density</button>
+        <button type="button" id="btn-globe-radiation" title="H6 solar radiation intensity (proxy)">Radiation</button>
+        <button type="button" id="btn-globe-blend" title="Density + radiation blend">Blend</button>
+      </div>
+      <div class="sub" id="globe-layer-info">density thermal</div>
 
       <h2 style="margin-top:1.2rem">Stats</h2>
       <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
@@ -46,6 +54,16 @@
       <div class="stat"><span>Using</span><b id="stat-using">—</b></div>
       <div class="stat"><span>Feeder</span><b id="stat-feeder">—</b></div>
       <div class="stat"><span>TLE</span><b id="stat-src" style="font-size:.72rem;max-width:55%;text-align:right;word-break:break-all">—</b></div>
+
+      <h2 style="margin-top:1.2rem">Fleet (H7)</h2>
+      <p class="sub" style="margin:0 0 .4rem">Public Celestrak catalogs · no API key</p>
+      <select id="fleet-select" style="width:100%;margin-bottom:.35rem;background:#1e1824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.4rem">
+        <option value="starlink">Starlink</option>
+      </select>
+      <div class="btns">
+        <button id="btn-fleet-apply" type="button" title="Reload map from selected fleet">Load fleet</button>
+      </div>
+      <div class="sub" id="fleet-info">fleet —</div>
 
       <h2 style="margin-top:1.2rem">Filter (S4b)</h2>
       <fieldset>
@@ -97,33 +115,57 @@
       </div>
       <div class="sub" id="wx-disclaimer" style="margin-top:.4rem"></div>
 
+      <h2 style="margin-top:1.2rem">Horizons (H3)</h2>
+      <p class="sub" style="margin:0 0 .5rem">1h / 6h / 24h · decay + short trend · research only</p>
+      <div id="predict-horizons" class="an-top"></div>
+      <div class="sub" id="predict-method" style="margin-top:.35rem"></div>
+
       <h2 style="margin-top:1.2rem">Shell hazard</h2>
       <div id="hazard-shell-list" class="an-top"></div>
+
+      <h2 style="margin-top:1.2rem">Altitude / sunlit (H5)</h2>
+      <p class="sub" style="margin:0 0 .5rem">Geometric proxy · not eclipse ephemeris</p>
+      <div class="stat"><span>Sunlit</span><b id="geo-sunlit">—</b></div>
+      <div class="stat"><span>Alt median</span><b id="geo-alt-med">—</b></div>
+      <div class="stat"><span>Alt range</span><b id="geo-alt-range">—</b></div>
+      <div class="sub" id="geo-badge" style="margin:.35rem 0"></div>
+      <div id="geo-bands" class="an-top"></div>
 
       <h2 style="margin-top:1.2rem">Shells</h2>
       <div id="shell-list"></div>
     </aside>
 
-    <section class="panel" id="panel-heatmap">
+    <section class="panel panel-viz" id="panel-heatmap">
       <h2>Map (2D) · <span id="map2d-title" class="sub">density</span></h2>
-      <div class="viz-wrap">
-        <canvas id="heatmap" width="720" height="360"></canvas>
+      <div class="viz-wrap viz-map" id="map-wrap">
+        <canvas id="heatmap" width="960" height="480"></canvas>
+        <div class="edge-aura" id="map-aura" aria-hidden="true"></div>
         <div class="tooltip" id="tooltip"></div>
       </div>
       <div class="legend-row" id="map-legend">
         <span class="leg-swatch dens"></span><span class="sub">density</span>
         <span class="leg-swatch haz"></span><span class="sub">solar exposure (proxy)</span>
+        <span class="leg-swatch aura"></span><span class="sub">edge aura ∝ solar stress</span>
       </div>
       <p class="sub" style="margin:.75rem 0 0">
-        Hover cell · layer Density / Hazard / Blend · filter shell / min · poll every 5s.
+        Hover cell · adaptive px (few→large, many→~1px) · edge aura · poll every 5s.
       </p>
     </section>
 
-    <section class="panel" id="panel-globe" style="display:none">
+    <section class="panel panel-viz" id="panel-globe" style="display:none">
       <h2>Globe (3D) · <span id="globe-meta" class="sub">—</span></h2>
-      <div class="viz-wrap" id="globe-host" style="min-height:360px"></div>
+      <div class="viz-wrap viz-globe" id="globe-wrap">
+        <div class="globe-host" id="globe-host"></div>
+        <div class="edge-aura" id="globe-aura" aria-hidden="true"></div>
+      </div>
+      <div class="legend-row" id="globe-legend" style="margin-top:.5rem">
+        <span class="leg-swatch dens"></span><span class="sub">density</span>
+        <span class="leg-swatch haz"></span><span class="sub">radiation intensity (proxy)</span>
+        <span class="leg-swatch aura"></span><span class="sub">edge aura ∝ solar stress</span>
+      </div>
       <p class="sub" style="margin:.75rem 0 0">
-        Drag to rotate · scroll zoom · Three.js CDN · data from <code>/api/sphere</code>
+        Drag to rotate · scroll zoom · larger viewport · layers Density / Radiation / Blend ·
+        edge aura on frame border.
       </p>
     </section>
   </main>

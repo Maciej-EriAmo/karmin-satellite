@@ -451,7 +451,7 @@ DONE WHEN:
 | **TOR A — design against 50k SLA** | **DONE 2026-08-11** | `docs/SLA_50K.md` · `engine/sla.py` · `/api/sla` · capacity hard gates |
 | **Most RPC → żywy Cynober DB** | **DONE (optional)** | `adapters/cynober_rpc.py` · `--rpc-push/pull/health` · `/api/rpc/*` · density-first |
 | **Studio library/analyze/viz** | **DONE 2026-08-11** | Library load, Analyze, process+viz workflow |
-| **Hazard H0+H1+H2** | **DONE 2026-08-12** | NOAA weather + shell hazard + 2D overlay (Density/Hazard/Blend) |
+| **Hazard H0–H6** | **DONE 2026-08-12** | weather + hazard + 2D/3D layers + predict + report/snapshot solar |
 | Narzędzia analityczne (analytics deeper) | later | po hazard; charty, batch snap×states |
 | Pełniejszy EN w UI | later | SLA docs już PL+EN |
 | Soak 30 min live-feed (ops) | LOW | unit feeder OK |
@@ -480,25 +480,20 @@ DONE WHEN:
 
 | Krok | Status | Deliverable |
 |------|--------|-------------|
-| **H0** weather adapter | **DONE 2026-08-12** | `adapters/space_weather.py` · F10.7, X-ray/flare, Kp · cache/stub · `GET /api/weather` · CLI `--weather` |
-| **H1** hazard groups | **DONE 2026-08-12** | `engine/hazard.py` · score + INFO/WATCH/WARNING · per shell · `GET /api/hazard` · UI badge/panel |
+| **H0** weather | **DONE 2026-08-12** | `engine/solar/weather.py` · F10.7, X-ray/flare, Kp · cache/stub · `GET /api/weather` · `main.py weather` |
+| **H1** hazard groups | **DONE 2026-08-12** | `engine/solar/hazard.py` · score + INFO/WATCH/WARNING · per shell · `GET /api/hazard` · `main.py hazard` |
 | **H2** 2D overlay | **DONE 2026-08-12** | layers Density/Hazard/Blend · exposure = score×density weight · `?grid=1` · tooltip |
-| **H3** predict | **NEXT** | horyzonty 1h/6h/24h z public indices + opc. forward prop; API/CLI |
-| **H4** hazard report | **NEXT+1** | JSON/MD raport grupy · Save w snapshot meta · CLI `--hazard-report` |
-| **H5** alt-band / sunlit | later | pasy wysokości + day/night fraction |
-| **H6** 3D radiation intensity | **later (explicit)** | warstwa natężenia na globe quads (TODO w `ui/static/globe.js`) |
-| **H7** multi-fleet catalogs | later | `CatalogProvider` · Starlink first · NASA TLE / Celestrak groups / country filter (public only) |
-| **H8** adaptive UX | later | **mało satów → duże px**; **duży katalog → ~1 px** (`cell_px ∝ 1/n_sats`); view **grupami**; radiation = **mgła na obrzeżu** · `docs/HAZARD_LAYER.md` |
+| **H3** predict | **DONE 2026-08-12** | horyzonty 1h/6h/24h · `engine/solar/predict.py` · `GET /api/predict` · `main.py predict` · UI Horizons |
+| **H4** hazard report | **DONE 2026-08-12** | `engine/solar/report.py` · JSON/MD · `GET /api/report` · `main.py report` · snapshot `solar` meta |
+| **H5** alt-band / sunlit | **DONE 2026-08-12** | `engine/solar/geo.py` · bands + sunlit% · `GET /api/geo` · `main.py geo` · UI panel |
+| **H6** 3D radiation intensity | **DONE 2026-08-12** | `transform/sphere.py` layer radiation/blend · `GET /api/sphere?layer=` · UI 3D layer buttons |
+| **H7** multi-fleet catalogs | **DONE 2026-08-12** | `engine/catalogs.py` + `load_catalog` · Celestrak groups · `--fleet` / merge · `GET/POST /api/fleet(s)` · UI picker |
+| **H8** adaptive UX | **DONE 2026-08-12** | adaptive cell px + shell filter re-scale + edge aura vignette · `heatmap.js` / `studio.css` |
 
 ### Co następne (kolejność commitów)
 
 ```
-1. H3  predict horizons (public SWPC trends + optional prop minutes)
-2. H4  HazardReport JSON/MD + snapshot weather/hazard meta
-3. H6  3D radiation intensity on globe (after H3/H4 solid)
-4. H5  alt-band / sunlit polish
-5. H7  multi-fleet open catalogs (post-Starlink research expansion)
-6. H8  adaptive pixels (few→large, many→~1px) + group load + edge-fog radiation
+(polish) country/SATCAT filters · more ad-hoc groups · optional Space-Track later
 ```
 
 ---
@@ -546,14 +541,9 @@ cynober_studio/                    # teraz
 
 ```
 MVP 0–5 + SLA + RPC + library/analyze     ← DONE
-H0–H2 space weather + 2D hazard overlay   ← DONE 2026-08-12
+H0–H8 + H7 multi-fleet ← DONE 2026-08-12
 
-NEXT:
-1. [H3]  predict 1h/6h/24h (public indices)
-2. [H4]  hazard report JSON/MD + snapshot meta
-3. [H6]  3D radiation intensity on globe
-4. [H5]  alt-band / sunlit
-5. [H7]  multi-fleet open catalogs (NASA/Celestrak public)
+NEXT: polish (SATCAT/country, more groups) if needed
 ```
 
 Historyczne (ukończone):

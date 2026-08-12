@@ -1,4 +1,7 @@
-"""Adapters: snapshots, optional Cynober RPC, public space weather."""
+"""Adapters: snapshots + optional Cynober RPC.
+
+Solar weather lives in ``engine.solar`` (shims under adapters.space_weather).
+"""
 
 from __future__ import annotations
 
@@ -10,8 +13,6 @@ __all__ = [
     "CynoberRpcBridge",
     "client_available",
     "rpc_status_dict",
-    "get_space_weather",
-    "SpaceWeatherSnapshot",
 ]
 
 
@@ -21,8 +22,4 @@ def __getattr__(name: str):
         from adapters import cynober_rpc as _rpc
 
         return getattr(_rpc, name)
-    if name in ("get_space_weather", "SpaceWeatherSnapshot"):
-        from adapters import space_weather as _wx
-
-        return getattr(_wx, name)
     raise AttributeError(name)
