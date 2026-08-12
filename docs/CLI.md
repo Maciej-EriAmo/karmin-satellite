@@ -89,10 +89,15 @@ python main.py hazard --offline-demo --limit 40 --offline --with-predict --no-he
 python main.py report --offline-demo --limit 40 --offline --json --md --save-snapshot
 python main.py geo --offline-demo --limit 40 --no-heatmap
 
-:: fleets
+:: fleets + country (A)
 python main.py fleets
 python main.py --fleet iridium --limit 100 --offline-demo --no-heatmap
 python main.py --fleet starlink,oneweb --limit 40 --offline-demo --no-heatmap
+python main.py --fleet starlink --country US --limit 200 --offline-demo --no-heatmap
+
+:: timeline (B)
+python main.py timeline
+python main.py timeline --compare snap_A snap_B
 
 :: snapshots / RPC
 python main.py --offline-demo --limit 40 --snapshot-save
@@ -107,4 +112,6 @@ python main.py --rpc-health
 - [HAZARD_LAYER.md](HAZARD_LAYER.md) — H0–H8 solar + geo + UX  
 - [STARLINK_ATOMS.md](STARLINK_ATOMS.md) — engine contract  
 - [SLA_50K.md](SLA_50K.md) — scale budgets  
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) — COMPLETE / maintenance  
 - [README.md](../README.md) — product overview + HTTP API  
+
