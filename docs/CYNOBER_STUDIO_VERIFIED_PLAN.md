@@ -451,8 +451,8 @@ DONE WHEN:
 | **TOR A — design against 50k SLA** | **DONE 2026-08-11** | `docs/SLA_50K.md` · `engine/sla.py` · `/api/sla` · capacity hard gates |
 | **Most RPC → żywy Cynober DB** | **DONE (optional)** | `adapters/cynober_rpc.py` · `--rpc-push/pull/health` · `/api/rpc/*` · density-first |
 | **Studio library/analyze/viz** | **DONE 2026-08-11** | Library load, Analyze, process+viz workflow |
-| **Hazard H0–H6** | **DONE 2026-08-12** | weather + hazard + 2D/3D layers + predict + report/snapshot solar |
-| Narzędzia analityczne (analytics deeper) | later | po hazard; charty, batch snap×states |
+| **Hazard H0–H8 + multi-fleet H7** | **DONE 2026-08-12** | solar package · 3D radiation · adaptive UX · Celestrak fleets |
+| Narzędzia analityczne (analytics deeper) | later | charty, batch snap×states |
 | Pełniejszy EN w UI | later | SLA docs już PL+EN |
 | Soak 30 min live-feed (ops) | LOW | unit feeder OK |
 | Delta JSON / ETag | LOW | version poll wystarcza na MVP |
@@ -471,10 +471,12 @@ DONE WHEN:
 **Cynober Studio** = kompletne **narzędzie badawcze dla pasjonatów** publicznego nieba:
 
 - mapa / obróbka / snapshoty (density SoT, shells, 2D/3D)
-- publiczna pogoda kosmiczna (NOAA SWPC) + hazard grup
-- później: multi-fleet z open catalogs (NASA TLE, Celestrak SATCAT…), raporty, predykcja
+- publiczna pogoda kosmiczna (NOAA SWPC) + hazard / predict / report / geo
+- multi-fleet z **Celestrak** open catalogs (`engine/catalogs.py`)
+- adaptive UX (cell px + edge aura) · duże viewport 3D
 
-**Zasada:** tylko dane publiczne; proxy badawcze ≠ certyfikat misji / ops.
+**Zasada:** tylko dane publiczne; proxy badawcze ≠ certyfikat misji / ops.  
+**Docs:** [HAZARD_LAYER.md](HAZARD_LAYER.md) · [CLI.md](CLI.md) · [STARLINK_ATOMS.md](STARLINK_ATOMS.md).
 
 ### Tor Hazard / solar (post-MVP)
 
@@ -501,19 +503,18 @@ DONE WHEN:
 ## 5. Drzewo docelowe (ewolucja z obecnego)
 
 ```
-cynober_studio/                    # teraz
+cynober_studio/
 ├── main.py
-├── substrate/                     # L0 — stabilne, rzadkie zmiany
+├── substrate/                 # L0 thermal store
 ├── engine/
-│   └── starlink_atoms.py          # → rozbić stopniowo:
-│       # starlink_map.py, tle.py, export.py, prop.py
-├── transform/                     # Faza 4 sphere; Faza 1 filter helpers
-├── ui/                            # Faza 2
-│   ├── app.py
-│   ├── templates/
-│   └── static/
-├── adapters/                      # Faza 5
-├── docs/                          # plan, audit, THIS
+│   ├── tle · prop · grid · map · build · cli · feeder · sla
+│   ├── catalogs.py            # H7 fleets
+│   ├── solar/                 # H0–H5
+│   └── starlink_atoms.py      # facade
+├── transform/sphere.py        # 3D + H6 radiation
+├── ui/                        # Studio HTTP 2D/3D + H8 UX
+├── adapters/                  # snapshots · RPC · shims
+├── docs/                      # CLI · HAZARD · SLA · THIS
 ├── tests/
 └── out/
 ```
