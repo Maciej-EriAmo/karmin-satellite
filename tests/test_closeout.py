@@ -12,6 +12,18 @@ sys.path.insert(0, str(ROOT / "substrate"))
 sys.path.insert(0, str(ROOT))
 
 
+class TestFleetAllAlias(unittest.TestCase):
+    def test_parse_all(self):
+        from engine.catalogs import curated_fleet_ids, parse_fleet_list
+
+        ids = parse_fleet_list("all")
+        self.assertIn("starlink", ids)
+        self.assertIn("oneweb", ids)
+        self.assertNotIn("active", ids)
+        self.assertEqual(ids, curated_fleet_ids(include_active=False))
+        self.assertIn("active", parse_fleet_list("all+active"))
+
+
 class TestSatcatCountry(unittest.TestCase):
     def test_fleet_heuristic_and_filter(self):
         from engine.satcat import (

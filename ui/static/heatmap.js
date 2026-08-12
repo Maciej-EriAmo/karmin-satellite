@@ -17,8 +17,38 @@
     cellPx: 8,
     fleet: "starlink",
     country: "",
+    loadLimit: 400, // UI slider; 0 = full catalog
     versionEtag: null,
   };
+
+  function readLoadLimit() {
+    const full = $("load-limit-full");
+    if (full && full.checked) return 0;
+    const r = $("load-limit");
+    if (!r) return state.loadLimit || 400;
+    const v = parseInt(r.value, 10);
+    return Number.isFinite(v) ? v : 400;
+  }
+
+  function syncLoadLimitUI(limit) {
+    const lim = limit == null ? state.loadLimit : Number(limit);
+    state.loadLimit = lim;
+    const full = $("load-limit-full");
+    const r = $("load-limit");
+    const lab = $("load-limit-val");
+    if (full) full.checked = lim === 0;
+    if (r) {
+      r.disabled = lim === 0;
+      if (lim > 0) {
+        const lo = parseInt(r.min, 10) || 40;
+        const hi = parseInt(r.max, 10) || 5000;
+        r.value = String(Math.max(lo, Math.min(hi, lim)));
+      }
+    }
+    if (lab) {
+      lab.textContent = lim === 0 ? "full (0)" : String(lim > 0 ? lim : r?.value || 400);
+    }
+  }
   // shared with globe.js for shell/min_count + layer handoff
   window.CynoberStudioState = state;
 
@@ -436,12 +466,16 @@
     const j = await fetchJSON("/api/data");
     state.full = j.data;
     state.version = j.data.version || 0;
+    if (j.data.limit != null) {
+      syncLoadLimitUI(j.data.limit);
+    }
     if (j.data.fleet) {
       state.fleet = j.data.fleet;
       state.country = j.data.country || "";
+      const lim = j.data.limit != null ? j.data.limit : state.loadLimit;
       setText(
         "fleet-info",
-        `fleet ${j.data.fleet}${j.data.country ? " · " + j.data.country : ""} · src ${j.data.tle_source || "—"}`
+        `fleet ${j.data.fleet}${j.data.country ? " · " + j.data.country : ""} · limit ${lim === 0 ? "full" : lim} · src ${j.data.tle_source || "—"}`
       );
       const sel = $("fleet-select");
       if (sel && ![...sel.options].some((o) => o.value === j.data.fleet)) {
@@ -479,14 +513,29 @@
         opt.textContent = f.label + (f.note ? ` — ${f.note}` : "");
         sel.appendChild(opt);
       });
-      // merge option
       const merge = document.createElement("option");
       merge.value = "starlink,oneweb";
       merge.textContent = "Starlink + OneWeb (merge)";
       sel.appendChild(merge);
+      const all = document.createElement("option");
+      all.value = "all";
+      all.textContent = "All curated fleets (merge, no active)";
+      sel.appendChild(all);
       if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
-      else sel.value = cur.split(",")[0] || "starlink";
-      setText("fleet-info", `fleet ${cur}`);
+      else if (String(cur).includes(",")) {
+        // keep multi as custom option
+        const opt = document.createElement("option");
+        opt.value = cur;
+        opt.textContent = `Current merge: ${cur}`;
+        sel.appendChild(opt);
+        sel.value = cur;
+      } else sel.value = cur.split(",")[0] || "starlink";
+      const lim = state.full?.limit != null ? state.full.limit : state.loadLimit;
+      syncLoadLimitUI(lim);
+      setText(
+        "fleet-info",
+        `fleet ${cur} · limit ${lim === 0 ? "full" : lim}`
+      );
     } catch (e) {
       /* ignore */
     }
@@ -497,32 +546,54 @@
     const csel = $("country-select");
     const fleet = (sel && sel.value) || "starlink";
     const country = (csel && csel.value) || "";
-    setText("fleet-info", `loading ${fleet}${country ? " · " + country : ""}…`);
-    $("badge-status").textContent = "fleet…";
-    const j = await fetchJSON("/api/fleet", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fleet,
-        country: country || null,
-        limit: state.full?.limit || 0,
-      }),
-    });
-    state.fleet = j.data.fleet;
-    state.country = j.data.country || "";
+    const limit = readLoadLimit();
+    const limitLabel = limit === 0 ? "full" : String(limit);
     setText(
       "fleet-info",
-      `fleet ${j.data.fleet}${state.country ? " · " + state.country : ""} · n=${j.data.using} · ${j.data.src || ""}`
+      `loading ${fleet}${country ? " · " + country : ""} · limit ${limitLabel}…`
     );
-    if (j.data.summary && j.data.summary.countries) {
-      fillCountrySelect(j.data.summary.countries, state.country);
+    $("badge-status").textContent = "loading…";
+    const btn = $("btn-load-sats");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Loading…";
     }
-    await loadData();
-    if (window.CynoberGlobe && document.getElementById("panel-globe")?.style.display !== "none") {
-      window.CynoberGlobe.refresh();
+    try {
+      const j = await fetchJSON("/api/fleet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fleet,
+          country: country || null,
+          limit,
+        }),
+      });
+      state.fleet = j.data.fleet;
+      state.country = j.data.country || "";
+      state.loadLimit = j.data.limit != null ? j.data.limit : limit;
+      syncLoadLimitUI(state.loadLimit);
+      setText(
+        "fleet-info",
+        `fleet ${j.data.fleet}${state.country ? " · " + state.country : ""} · n=${j.data.using} · limit ${state.loadLimit === 0 ? "full" : state.loadLimit} · ${j.data.src || ""}`
+      );
+      if (j.data.summary && j.data.summary.countries) {
+        fillCountrySelect(j.data.summary.countries, state.country);
+      }
+      await loadData();
+      if (
+        window.CynoberGlobe &&
+        document.getElementById("panel-globe")?.style.display !== "none"
+      ) {
+        window.CynoberGlobe.refresh();
+      }
+      $("badge-status").textContent = "live";
+      $("badge-status").classList.add("ok");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Load satellites";
+      }
     }
-    $("badge-status").textContent = "live";
-    $("badge-status").classList.add("ok");
   }
 
   async function loadTimeline() {
@@ -960,9 +1031,30 @@
     $("btn-weather")?.addEventListener("click", () => {
       loadWeatherHazard(true).catch((e) => setText("err", String(e.message || e)));
     });
+    $("btn-load-sats")?.addEventListener("click", () => {
+      applyFleet().catch((e) => setText("err", String(e.message || e)));
+    });
     $("btn-fleet-apply")?.addEventListener("click", () => {
       applyFleet().catch((e) => setText("err", String(e.message || e)));
     });
+    const loadLim = $("load-limit");
+    if (loadLim) {
+      loadLim.addEventListener("input", () => {
+        if ($("load-limit-full")?.checked) return;
+        setText("load-limit-val", loadLim.value);
+        state.loadLimit = parseInt(loadLim.value, 10) || 400;
+      });
+    }
+    $("load-limit-full")?.addEventListener("change", (ev) => {
+      const on = !!ev.target.checked;
+      if (on) {
+        syncLoadLimitUI(0);
+      } else {
+        const r = $("load-limit");
+        syncLoadLimitUI(parseInt(r?.value || "400", 10) || 400);
+      }
+    });
+    syncLoadLimitUI(state.loadLimit);
     $("btn-timeline")?.addEventListener("click", () => {
       loadTimeline().catch((e) => setText("err", String(e.message || e)));
     });

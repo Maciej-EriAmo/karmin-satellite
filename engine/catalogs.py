@@ -159,16 +159,43 @@ def get_fleet(fleet_id: str) -> CatalogSpec:
     )
 
 
+def curated_fleet_ids(*, include_active: bool = False) -> List[str]:
+    """Ordered curated fleet ids (optionally including huge 'active' group)."""
+    ids = [c.id for c in FLEET_CATALOG]
+    if not include_active:
+        ids = [i for i in ids if i != "active"]
+    return ids
+
+
 def parse_fleet_list(value: Optional[str]) -> List[str]:
     """
     'starlink' | 'starlink,oneweb' | 'starlink+oneweb' → list of ids.
+    'all' / '*' → all curated fleets except 'active' (use 'all+active' for that).
     Empty → ['starlink'].
     """
     if not value or not str(value).strip():
         return ["starlink"]
-    raw = str(value).replace("+", ",").replace(";", ",")
+    raw = str(value).replace("+", ",").replace(";", ",").strip().lower()
+    if raw in ("all", "*", "all-curated", "all_curated"):
+        return curated_fleet_ids(include_active=False)
+    if raw in ("all+active", "all_active", "all,active"):
+        return curated_fleet_ids(include_active=True)
     parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or ["starlink"]
+    # expand lone 'all' token inside a list
+    expanded: List[str] = []
+    for p in parts:
+        if p in ("all", "*"):
+            expanded.extend(curated_fleet_ids(include_active=False))
+        else:
+            expanded.append(p)
+    # dedupe preserve order
+    seen = set()
+    out: List[str] = []
+    for p in expanded:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out or ["starlink"]
 
 
 def default_cache_path(fleet_id: str, root: str = "out") -> str:

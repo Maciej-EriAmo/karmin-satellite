@@ -644,7 +644,11 @@ def create_handler(state: StudioState):
                 _json_response(self, 200, {"status": "ok", "data": data})
                 return
             if path == "/api/fleets":
-                from engine.catalogs import list_fleets, parse_fleet_list
+                from engine.catalogs import (
+                    curated_fleet_ids,
+                    list_fleets,
+                    parse_fleet_list,
+                )
 
                 _json_response(
                     self,
@@ -655,6 +659,8 @@ def create_handler(state: StudioState):
                             "fleets": list_fleets(),
                             "current": state.fleet,
                             "current_ids": parse_fleet_list(state.fleet),
+                            "all_curated": curated_fleet_ids(include_active=False),
+                            "limit": state.limit,
                         },
                     },
                 )

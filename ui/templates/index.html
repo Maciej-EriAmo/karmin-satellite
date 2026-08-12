@@ -55,19 +55,29 @@
       <div class="stat"><span>Feeder</span><b id="stat-feeder">—</b></div>
       <div class="stat"><span>TLE</span><b id="stat-src" style="font-size:.72rem;max-width:55%;text-align:right;word-break:break-all">—</b></div>
 
-      <h2 style="margin-top:1.2rem">Fleet (H7)</h2>
-      <p class="sub" style="margin:0 0 .4rem">Public Celestrak catalogs · no API key</p>
-      <select id="fleet-select" style="width:100%;margin-bottom:.35rem;background:#1e1824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.4rem">
+      <h2 style="margin-top:1.2rem">Load satellites</h2>
+      <p class="sub" style="margin:0 0 .4rem">Public Celestrak · one fleet, merge, or all curated</p>
+      <label class="sub" for="fleet-select" style="display:block;margin:0 0 .2rem">Catalog / fleet</label>
+      <select id="fleet-select" class="ctl-select">
         <option value="starlink">Starlink</option>
       </select>
-      <label class="sub" for="country-select" style="display:block;margin:.35rem 0 .2rem">Country (SATCAT / heuristic)</label>
-      <select id="country-select" style="width:100%;margin-bottom:.35rem;background:#1e1824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.4rem">
+      <label class="sub" for="country-select" style="display:block;margin:.45rem 0 .2rem">Country filter</label>
+      <select id="country-select" class="ctl-select">
         <option value="">All countries</option>
       </select>
-      <div class="btns">
-        <button id="btn-fleet-apply" type="button" title="Reload map from selected fleet / country">Load fleet</button>
+      <fieldset style="margin-top:.65rem">
+        <legend>Load limit · <span id="load-limit-val">400</span></legend>
+        <input type="range" id="load-limit" min="40" max="5000" step="40" value="400"/>
+        <div class="sub" style="margin-top:.25rem">40 … 5000 · or full catalog below</div>
+        <label class="row" style="margin-top:.35rem">
+          <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling)
+        </label>
+      </fieldset>
+      <div class="btns" style="margin-top:.5rem">
+        <button class="primary" id="btn-load-sats" type="button" title="Download / rebuild map from selected catalog and limit">Load satellites</button>
+        <button id="btn-fleet-apply" type="button" title="Same as Load satellites">Reload</button>
       </div>
-      <div class="sub" id="fleet-info">fleet —</div>
+      <div class="sub" id="fleet-info">fleet — · limit —</div>
 
       <h2 style="margin-top:1.2rem">Filter (S4b)</h2>
       <fieldset>

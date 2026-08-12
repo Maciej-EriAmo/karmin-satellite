@@ -342,6 +342,26 @@ canvas {
   font-variant-numeric: tabular-nums;
 }
 
+.ctl-select {
+  width: 100%;
+  margin-bottom: 0.35rem;
+  background: #1e1824;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem;
+  font-size: 0.85rem;
+}
+
+#btn-load-sats {
+  font-weight: 600;
+  min-width: 8.5rem;
+}
+
+#load-limit:disabled {
+  opacity: 0.45;
+}
+
 .tooltip {
   position: absolute;
   pointer-events: none;
