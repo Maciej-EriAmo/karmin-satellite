@@ -35,6 +35,30 @@ exposure ≈ base_score × (0.3 + 0.7 · log1p(count)/log1p(max_count))
 | **H6 later** | **3D radiation intensity** on globe quads (`ui/static/globe.js` TODO) |
 | **H5** | Alt-band + sunlit fraction |
 | **H7** | Multi-fleet: NASA TLE API, Celestrak groups/SATCAT country (public) |
+| **H8 UX later** | Adaptive pixels + group views + **radiation fog on cartouche** (see below) |
+
+## Future UX (captured 2026-08-12) — readability at full catalog
+
+**Problem:** przy załadowaniu *wszystkich* satelitów duże pixele siatki stają się nieczytelne (szum / zalanie mapy).
+
+**Kierunek (nie implementowane jeszcze):**
+
+1. **Adaptive cell size** — pomniejszać widok / cell rendering w zależności od `n_sats` (i viewportu), w dół **aż do ~1 px** na komórkę przy pełnej konstelacji.
+2. **Wywołanie grupami** — wizualizacja i/lub load po **grupach** (shell, batch okien), żeby odzyskać czytelność; pełny katalog nie musi być jednym „grubym” pixelem na wszystko.
+3. **Promieniowanie / hazard ambient** — zamiast (lub obok) malowania stressu w pixelach mapy: **mgła na kartuszu / obrzeżu wewnątrz okna graficznego** (vignette / edge fog). Natężenie mgły ∝ solar stress (global lub aktywnej grupy). Mapa density zostaje czytelna; stress = atmosfera ramki.
+
+```text
+┌─────────────────────────────┐
+│ ░░ fog (radiation stress) ░░│
+│ ░  ┌─────────────────┐   ░  │
+│ ░  │  density cells  │   ░  │  ← adaptive px / group filter
+│ ░  │  (1px…coarse)   │   ░  │
+│ ░  └─────────────────┘   ░  │
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░  │
+└─────────────────────────────┘
+```
+
+H2 layers (Density/Hazard/Blend) zostają opcją badawczą; **fog na obrzeżu** = domyślny, nieinwazyjny sygnał pogody.
 
 ## CLI
 
