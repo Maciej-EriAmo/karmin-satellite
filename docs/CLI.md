@@ -22,6 +22,7 @@ python main.py --help          # top-level help
 | `report` | H4 HazardReport JSON/MD + optional snapshot `solar` |
 | `geo` | H5 altitude bands + sunlit fraction |
 | `fleets` | H7 list public Celestrak fleets |
+| `timeline` | B snapshot density timeline / compare |
 
 Legacy: `python main.py --studio …` still works (maps to studio).  
 Removed flag soup: `--weather` / `--predict` / `--hazard` → use subcommands.
@@ -35,6 +36,8 @@ Removed flag soup: `--weather` / `--predict` / `--hazard` → use subcommands.
 | `--limit N` | 400 | `0` = whole catalog (arch ceiling applies) |
 | `--offline-demo` | off | Synthetic TLE (no network) |
 | `--fleet ID` | `starlink` | H7: `oneweb`, `starlink,oneweb`, … |
+| `--country CC` | — | A: SATCAT/heuristic country (`US`, `UK`, …) |
+| `--no-satcat` | off | skip country annotation |
 | `--hot-only` / `--full-grid` | auto | Auto hot-only when limit≥1000 or 0 |
 | `--prop auto\|sgp4\|approx` | auto | Propagator |
 | `--grid DEG` | 5 | Cell size degrees |

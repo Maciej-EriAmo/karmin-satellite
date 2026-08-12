@@ -387,6 +387,6 @@ def build_overlay(
         "mean_exposure": round(sum(exps) / len(exps), 2) if exps else 0.0,
         "note": (
             "2D exposure = solar score × density weight; "
-            "not physical radiation. 3D intensity layer planned later."
+            "not physical radiation; 3D radiation layer available via /api/sphere?layer=radiation."
         ),
     }

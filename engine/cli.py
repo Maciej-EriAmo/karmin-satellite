@@ -47,6 +47,7 @@ TOP_CMDS = frozenset(
         "report",
         "geo",
         "fleets",
+        "timeline",
         "studio",
         "run",
         "help",
@@ -93,6 +94,17 @@ def _add_map_args(ap: argparse.ArgumentParser) -> None:
         type=str,
         default="starlink",
         help="H7 fleet id or merge: starlink | oneweb | starlink,oneweb",
+    )
+    ap.add_argument(
+        "--country",
+        type=str,
+        default=None,
+        help="A: filter by SATCAT/heuristic country code (e.g. US, UK)",
+    )
+    ap.add_argument(
+        "--no-satcat",
+        action="store_true",
+        help="skip SATCAT country annotation",
     )
     ap.add_argument("--cache", type=str, default="out/starlink_tle_cache.txt")
     ap.add_argument("--lua", action="store_true", help=":tool starlink (izolowany Store)")
@@ -252,6 +264,8 @@ def _build_or_load(args: argparse.Namespace):
             minutes=args.minutes,
             arch_cap=not bool(args.no_arch_cap),
             fleet=str(getattr(args, "fleet", None) or "starlink"),
+            country=getattr(args, "country", None),
+            satcat=not bool(getattr(args, "no_satcat", False)),
         )
     dt = time.perf_counter() - t0
     return store, amap, use, src, snap_store, dt
@@ -271,6 +285,8 @@ def _print_map_summary(amap, use, src, args, dt: float) -> None:
     )
     if summ.get("fleets"):
         print(f"fleets={summ['fleets']}")
+    if summ.get("countries"):
+        print(f"countries={summ['countries']}")
     print(f"shells={summ['shells']}")
     print(f"max_cell={summ['max_cell']}")
     print(
@@ -453,6 +469,49 @@ def cmd_report(argv: Sequence[str]) -> int:
             f"snapshot-save: {meta.snapshot_id}  solar=yes  "
             f"cells={meta.cells_count} → {meta.path}"
         )
+    return 0
+
+
+def cmd_timeline(argv: Sequence[str]) -> int:
+    """B: snapshot timeline + optional compare."""
+    ap = argparse.ArgumentParser(
+        prog="main.py timeline",
+        description="B snapshot timeline / density compare",
+    )
+    ap.add_argument(
+        "--snapshot-dir",
+        type=str,
+        default="out/snapshots",
+        help="snapshot directory",
+    )
+    ap.add_argument("--limit", type=int, default=30, help="max frames")
+    ap.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("A", "B"),
+        default=None,
+        help="compare two snapshot ids",
+    )
+    args = ap.parse_args(list(argv))
+    from adapters.snapshot_store import SnapshotStore
+    from engine.analytics import compare_density, timeline_from_store
+
+    store = SnapshotStore(Path(args.snapshot_dir), retention_days=0)
+    if args.compare:
+        a_id, b_id = args.compare
+        pa, pb = store.load_raw(a_id), store.load_raw(b_id)
+        print("--- compare ---")
+        print(_json_out(compare_density(pa, pb)))
+        return 0
+    rows = timeline_from_store(store, limit=int(args.limit))
+    print(f"--- timeline n={len(rows)} dir={store.root} ---")
+    for r in rows:
+        print(
+            f"{r.get('created_at', ''):22}  {r.get('snapshot_id', ''):28}  "
+            f"cells={r.get('cells', '—')}  Σ={r.get('sum_count', '—')}  "
+            f"max={r.get('max_count', '—')}  haz={r.get('hazard_score', '—')}"
+        )
+    print(_json_out({"n": len(rows), "frames": rows}))
     return 0
 
 
@@ -680,6 +739,7 @@ def cmd_run(argv: Sequence[str], *, studio: bool = False) -> int:
             cache_ttl_hours=float(args.cache_ttl_hours),
             studio_mode=str(args.studio_mode or "2d"),
             fleet=str(getattr(args, "fleet", None) or "starlink"),
+            country=str(getattr(args, "country", None) or ""),
         )
         if args.live_feed:
             state.attach_feeder(
@@ -780,7 +840,8 @@ Usage:
   python main.py report  [map opts] [--offline] [--json] [--md] [--save-snapshot]
   python main.py geo     [map opts]              # H5 alt-band + sunlit
   python main.py fleets                          # H7 list public catalogs
-  python main.py studio  [map opts] [--fleet F] [--open-browser]
+  python main.py timeline [--compare A B]        # B snapshot timeline
+  python main.py studio  [map opts] [--fleet F] [--country US] [--open-browser]
   python main.py         [map opts]              # one-shot map (default)
   python main.py run     [map opts]              # same as default
 
@@ -791,16 +852,20 @@ Solar (engine.solar):
   report    H4 HazardReport JSON/MD + optional snapshot solar meta
   geo       H5 altitude bands + sunlit fraction
   fleets    H7 public Celestrak fleet list
+  timeline  B snapshot density timeline / compare
 
 Map / studio (examples):
   python main.py --offline-demo --limit 40 --no-heatmap
   python main.py --fleet oneweb --limit 200
+  python main.py --fleet starlink --country US --limit 200
   python main.py --fleet starlink,oneweb --limit 400
   python main.py studio --offline-demo --limit 40 --open-browser
   python main.py hazard --offline-demo --limit 40 --offline
   python main.py report --offline-demo --limit 40 --offline --md --json
   python main.py geo --offline-demo --limit 40 --no-heatmap
   python main.py fleets
+  python main.py timeline
+  python main.py timeline --compare snap_A snap_B
 """
     )
     return 0
@@ -833,6 +898,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return cmd_geo(rest)
     if cmd == "fleets":
         return cmd_fleets(rest)
+    if cmd == "timeline":
+        return cmd_timeline(rest)
     if cmd == "studio":
         return cmd_run(rest, studio=True)
     if cmd == "run":

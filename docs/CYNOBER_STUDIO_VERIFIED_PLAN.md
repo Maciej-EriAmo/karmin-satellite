@@ -452,8 +452,12 @@ DONE WHEN:
 | **Most RPC → żywy Cynober DB** | **DONE (optional)** | `adapters/cynober_rpc.py` · `--rpc-push/pull/health` · `/api/rpc/*` · density-first |
 | **Studio library/analyze/viz** | **DONE 2026-08-11** | Library load, Analyze, process+viz workflow |
 | **Hazard H0–H8 + multi-fleet H7** | **DONE 2026-08-12** | solar package · 3D radiation · adaptive UX · Celestrak fleets |
-| Narzędzia analityczne (analytics deeper) | later | charty, batch snap×states |
-| Pełniejszy EN w UI | later | SLA docs już PL+EN |
+| **A SATCAT/country** | **DONE 2026-08-12** | `engine/satcat.py` · `--country` · UI country select |
+| **B timeline analytics** | **DONE 2026-08-12** | `engine/analytics.py` · `/api/timeline` · compare · UI Timeline |
+| **C UX polish** | **DONE 2026-08-12** | EN UI · ETag 304 poll · logging |
+| **D project close** | **DONE 2026-08-12** | [PROJECT_STATUS.md](PROJECT_STATUS.md) COMPLETE |
+| Narzędzia analityczne (deeper charts) | optional | only if needed |
+| Pełniejszy EN w UI | **DONE** | UI lang=en + labels |
 | Soak 30 min live-feed (ops) | LOW | unit feeder OK |
 | Delta JSON / ETag | LOW | version poll wystarcza na MVP |
 | Edit atoms (S4c) | — | out of scope |
@@ -492,10 +496,10 @@ DONE WHEN:
 | **H7** multi-fleet catalogs | **DONE 2026-08-12** | `engine/catalogs.py` + `load_catalog` · Celestrak groups · `--fleet` / merge · `GET/POST /api/fleet(s)` · UI picker |
 | **H8** adaptive UX | **DONE 2026-08-12** | adaptive cell px + shell filter re-scale + edge aura vignette · `heatmap.js` / `studio.css` |
 
-### Co następne (kolejność commitów)
+### Co następne
 
 ```
-(polish) country/SATCAT filters · more ad-hoc groups · optional Space-Track later
+PROJECT COMPLETE — optional only: deeper charts, more SATCAT fields, Space-Track
 ```
 
 ---
@@ -542,9 +546,9 @@ cynober_studio/
 
 ```
 MVP 0–5 + SLA + RPC + library/analyze     ← DONE
-H0–H8 + H7 multi-fleet ← DONE 2026-08-12
+H0–H8 + H7 multi-fleet + A/B/C close-out ← DONE 2026-08-12
 
-NEXT: polish (SATCAT/country, more groups) if needed
+STATUS: COMPLETE / maintenance — see PROJECT_STATUS.md
 ```
 
 Historyczne (ukończone):

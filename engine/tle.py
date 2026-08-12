@@ -40,6 +40,7 @@ class TleSat:
     mean_motion_rev_per_day: float
     ecc: float
     fleet: str = "starlink"
+    country: Optional[str] = None  # A: SATCAT / fleet heuristic
     _satrec: Any = field(default=None, repr=False, compare=False)
 
     @property

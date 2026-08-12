@@ -36,6 +36,8 @@ def build_map(
     catalog: List[TleSat] | None = None,
     src: str | None = None,
     fleet: str = "starlink",
+    country: str | None = None,
+    satcat: bool = True,
 ) -> Tuple[Any, StarlinkAtomMap, List[TleSat], str]:
     """API do seedowania Store (boot / tool / testy).
 
@@ -45,6 +47,8 @@ def build_map(
     arch_cap=True: twardy sufit ARCH_CEILING_SATS (100_000).
     catalog=...: gotowa lista (capacity tests); pomija fetch/parse.
     fleet: H7 — id floty lub lista ``starlink,oneweb``.
+    country: A — filter by SATCAT/heuristic country code (e.g. US, UK).
+    satcat: annotate countries from public SATCAT when possible.
     """
     if backend and backend != "default":
         os.environ["KARMAZYN_SUBSTRATE"] = backend
@@ -69,6 +73,19 @@ def build_map(
             limit_hint=limit or 12,
             per_fleet_limit=per,
         )
+
+    # A: country annotation + optional filter (before hard limit trim when country set)
+    if satcat or country:
+        from engine.satcat import SatcatIndex, country_counts, filter_by_country
+
+        idx = SatcatIndex(allow_network=not offline_demo).load()
+        n_sc, n_fb = idx.annotate_sats(full)
+        if country:
+            before = len(full)
+            full = filter_by_country(full, country)
+            src_s = f"{src_s} · country={country.strip().upper()} ({len(full)}/{before})"
+        elif n_sc or n_fb:
+            src_s = f"{src_s} · satcat={idx.source} (sc={n_sc},fb={n_fb})"
 
     use = full if limit == 0 else full[:limit]
     if arch_cap and len(use) > ARCH_CEILING_SATS:

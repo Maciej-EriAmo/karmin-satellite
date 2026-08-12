@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -10,7 +10,7 @@
   <header>
     <div>
       <h1><span>Cynober</span> Studio</h1>
-      <div class="sub">thermal atoms · Starlink density · 2D / 3D</div>
+      <div class="sub">thermal atoms · public fleets · density 2D / 3D · research workbench</div>
     </div>
     <div class="header-badges">
       <span class="badge" id="badge-status">boot</span>
@@ -60,8 +60,12 @@
       <select id="fleet-select" style="width:100%;margin-bottom:.35rem;background:#1e1824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.4rem">
         <option value="starlink">Starlink</option>
       </select>
+      <label class="sub" for="country-select" style="display:block;margin:.35rem 0 .2rem">Country (SATCAT / heuristic)</label>
+      <select id="country-select" style="width:100%;margin-bottom:.35rem;background:#1e1824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.4rem">
+        <option value="">All countries</option>
+      </select>
       <div class="btns">
-        <button id="btn-fleet-apply" type="button" title="Reload map from selected fleet">Load fleet</button>
+        <button id="btn-fleet-apply" type="button" title="Reload map from selected fleet / country">Load fleet</button>
       </div>
       <div class="sub" id="fleet-info">fleet —</div>
 
@@ -93,6 +97,15 @@
       </div>
       <div id="snap-list" class="snap-list"></div>
       <div class="sub" id="library-info"></div>
+
+      <h2 style="margin-top:1.2rem">Timeline (B)</h2>
+      <p class="sub" style="margin:0 0 .4rem">Density metrics across saved frames · compare last two</p>
+      <div class="btns">
+        <button id="btn-timeline" type="button">Refresh timeline</button>
+        <button id="btn-timeline-compare" type="button" title="Compare two newest snapshots">Compare newest</button>
+      </div>
+      <div id="timeline-list" class="snap-list" style="max-height:140px"></div>
+      <div class="sub" id="timeline-info"></div>
 
       <h2 style="margin-top:1.2rem">Analyze</h2>
       <div class="stat"><span>View cells</span><b id="an-cells">—</b></div>

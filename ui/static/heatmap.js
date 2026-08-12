@@ -15,6 +15,9 @@
     nlon: 72,
     nSats: 0, // for H8 adaptive pixels
     cellPx: 8,
+    fleet: "starlink",
+    country: "",
+    versionEtag: null,
   };
   // shared with globe.js for shell/min_count + layer handoff
   window.CynoberStudioState = state;
@@ -395,11 +398,38 @@
 
   async function fetchJSON(url, opts) {
     const resp = await fetch(url, opts);
+    if (resp.status === 304) {
+      return { status: "not_modified", _status: 304 };
+    }
     const j = await resp.json();
     if (!resp.ok || j.status === "error") {
       throw new Error(j.message || resp.statusText);
     }
+    const et = resp.headers.get("ETag");
+    if (et) j._etag = et;
     return j;
+  }
+
+  function fillCountrySelect(countries, current) {
+    const sel = $("country-select");
+    if (!sel) return;
+    const cur = (current || "").toUpperCase();
+    const entries = Object.entries(countries || {}).sort((a, b) => b[1] - a[1]);
+    sel.innerHTML = `<option value="">All countries</option>`;
+    entries.forEach(([code, n]) => {
+      if (!code || code === "?") return;
+      const opt = document.createElement("option");
+      opt.value = code;
+      opt.textContent = `${code} (${n})`;
+      sel.appendChild(opt);
+    });
+    if (cur && ![...sel.options].some((o) => o.value === cur)) {
+      const opt = document.createElement("option");
+      opt.value = cur;
+      opt.textContent = cur;
+      sel.appendChild(opt);
+    }
+    if (cur) sel.value = cur;
   }
 
   async function loadData() {
@@ -408,7 +438,11 @@
     state.version = j.data.version || 0;
     if (j.data.fleet) {
       state.fleet = j.data.fleet;
-      setText("fleet-info", `fleet ${j.data.fleet} · src ${j.data.tle_source || "—"}`);
+      state.country = j.data.country || "";
+      setText(
+        "fleet-info",
+        `fleet ${j.data.fleet}${j.data.country ? " · " + j.data.country : ""} · src ${j.data.tle_source || "—"}`
+      );
       const sel = $("fleet-select");
       if (sel && ![...sel.options].some((o) => o.value === j.data.fleet)) {
         const opt = document.createElement("option");
@@ -418,6 +452,9 @@
       }
       if (sel) sel.value = j.data.fleet.split(",")[0];
     }
+    const countries =
+      (j.data.summary && j.data.summary.countries) || j.data.countries || {};
+    fillCountrySelect(countries, state.country);
     // if filter active, re-apply; else full
     if (state.shell !== "all" || state.minCount > 1) {
       await applyFilter();
@@ -457,25 +494,77 @@
 
   async function applyFleet() {
     const sel = $("fleet-select");
+    const csel = $("country-select");
     const fleet = (sel && sel.value) || "starlink";
-    setText("fleet-info", `loading ${fleet}…`);
+    const country = (csel && csel.value) || "";
+    setText("fleet-info", `loading ${fleet}${country ? " · " + country : ""}…`);
     $("badge-status").textContent = "fleet…";
     const j = await fetchJSON("/api/fleet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fleet, limit: state.full?.limit || 0 }),
+      body: JSON.stringify({
+        fleet,
+        country: country || null,
+        limit: state.full?.limit || 0,
+      }),
     });
     state.fleet = j.data.fleet;
+    state.country = j.data.country || "";
     setText(
       "fleet-info",
-      `fleet ${j.data.fleet} · n=${j.data.using} · ${j.data.src || ""}`
+      `fleet ${j.data.fleet}${state.country ? " · " + state.country : ""} · n=${j.data.using} · ${j.data.src || ""}`
     );
+    if (j.data.summary && j.data.summary.countries) {
+      fillCountrySelect(j.data.summary.countries, state.country);
+    }
     await loadData();
     if (window.CynoberGlobe && document.getElementById("panel-globe")?.style.display !== "none") {
       window.CynoberGlobe.refresh();
     }
     $("badge-status").textContent = "live";
     $("badge-status").classList.add("ok");
+  }
+
+  async function loadTimeline() {
+    const j = await fetchJSON("/api/timeline?limit=30");
+    const box = $("timeline-list");
+    const frames = (j.data && j.data.frames) || [];
+    if (!box) return;
+    if (!frames.length) {
+      box.innerHTML = `<div class="snap-row"><span class="meta">no snapshots yet — Save a frame first</span></div>`;
+      setText("timeline-info", "timeline empty");
+      return;
+    }
+    box.innerHTML = frames
+      .slice()
+      .reverse()
+      .slice(0, 20)
+      .map(
+        (f) =>
+          `<div class="snap-row"><div><div>${f.snapshot_id || "—"}</div>` +
+          `<div class="meta">${f.created_at || ""} · cells ${f.cells ?? "—"} · Σ ${f.sum_count ?? "—"} · haz ${f.hazard_score ?? "—"}</div></div></div>`
+      )
+      .join("");
+    setText("timeline-info", `${frames.length} frames · oldest→newest metrics`);
+  }
+
+  async function compareNewestTimeline() {
+    const j = await fetchJSON("/api/timeline?limit=5");
+    const frames = (j.data && j.data.frames) || [];
+    if (frames.length < 2) {
+      setText("timeline-info", "need ≥2 snapshots to compare");
+      return;
+    }
+    const a = frames[frames.length - 2].snapshot_id;
+    const b = frames[frames.length - 1].snapshot_id;
+    const c = await fetchJSON(
+      `/api/timeline?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+    );
+    const d = c.data || {};
+    setText(
+      "timeline-info",
+      `compare ${a} → ${b}: ΔΣ=${d.delta_sum_count ?? "—"} grew=${d.grew} shrunk=${d.shrunk} new=${d.appeared} gone=${d.vanished}`
+    );
   }
 
   async function applyFilter() {
@@ -620,7 +709,13 @@
 
   async function pollVersion() {
     try {
-      const j = await fetchJSON("/api/version");
+      const headers = {};
+      if (state.versionEtag) headers["If-None-Match"] = state.versionEtag;
+      const j = await fetchJSON("/api/version", { headers });
+      if (j._status === 304 || j.status === "not_modified") {
+        return; // C: unchanged — skip redraw
+      }
+      if (j._etag) state.versionEtag = j._etag;
       if (j.version !== state.version) {
         await loadData();
       }
@@ -868,6 +963,12 @@
     $("btn-fleet-apply")?.addEventListener("click", () => {
       applyFleet().catch((e) => setText("err", String(e.message || e)));
     });
+    $("btn-timeline")?.addEventListener("click", () => {
+      loadTimeline().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-timeline-compare")?.addEventListener("click", () => {
+      compareNewestTimeline().catch((e) => setText("err", String(e.message || e)));
+    });
     $("btn-layer-density")?.addEventListener("click", () => setLayer("density"));
     $("btn-layer-hazard")?.addEventListener("click", () => setLayer("hazard"));
     $("btn-layer-blend")?.addEventListener("click", () => setLayer("blend"));
@@ -896,6 +997,7 @@
     setupTooltip();
     listSnapshots().catch(() => {});
     loadFleetList().catch(() => {});
+    loadTimeline().catch(() => {});
     // re-fit adaptive cells when panel width changes
     let _rz = null;
     window.addEventListener("resize", () => {

@@ -160,13 +160,15 @@ python main.py studio --offline-demo --limit 40 --open-browser
 
 See [CLI.md](CLI.md) for the full flag table.
 
-## Roadmap (optional polish)
+## Close-out (A/B/C)
 
-| Step | What |
-|------|------|
-| SATCAT / country filter | public Celestrak / open SATCAT metadata |
-| More ad-hoc groups | pass-through Celestrak GROUP names (already partial) |
-| Analytics deeper | batch snap×states, charts |
+| Item | Status |
+|------|--------|
+| **A** country / SATCAT | `engine/satcat.py` · `--country US` · UI country select · `summary.countries` |
+| **B** timeline | `engine/analytics.py` · `main.py timeline` · `GET /api/timeline` · UI Timeline |
+| **C** UX polish | EN UI · ETag/`304` on `/api/version` · logging |
+
+Project status: [PROJECT_STATUS.md](PROJECT_STATUS.md) (**COMPLETE**).
 
 ## Disclaimer (product)
 

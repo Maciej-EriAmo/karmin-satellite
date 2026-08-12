@@ -18,6 +18,7 @@ CLI default sample **400**. Capacity: `python tests\test_capacity.py`.
 | [`docs/STARLINK_ATOMS.md`](docs/STARLINK_ATOMS.md) | Engine contract & layout |
 | [`docs/SLA_50K.md`](docs/SLA_50K.md) | Scale budgets |
 | [`docs/CYNOBER_STUDIO_VERIFIED_PLAN.md`](docs/CYNOBER_STUDIO_VERIFIED_PLAN.md) | Roadmap / status |
+| [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) | **COMPLETE** — project closed for mandatory work |
 
 ## Layout
 

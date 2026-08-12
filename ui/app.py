@@ -20,10 +20,13 @@ Cynober Studio HTTP server (stdlib only).
   GET  /api/report    → H4 HazardReport JSON (+ ?md=1 Markdown body)
   GET  /api/geo       → H5 altitude bands + sunlit fraction
   GET  /api/fleets    → H7 public catalog list
-  POST /api/fleet     → {fleet} switch catalog (rebuild map)
+  POST /api/fleet     → {fleet, country?} switch catalog (rebuild map)
+  GET  /api/timeline  → B snapshot timeline metrics
+  GET  /api/timeline/compare?a=&b= → density delta between snapshots
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import mimetypes
@@ -48,6 +51,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 log = logging.getLogger("cynober.studio")
+if not logging.root.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [cynober.studio] %(message)s",
+    )
 
 
 @dataclass
@@ -63,6 +71,7 @@ class StudioState:
     cache: str = "out/starlink_tle_cache.txt"
     cache_ttl_hours: float = 12.0
     fleet: str = "starlink"  # H7: id or starlink,oneweb
+    country: str = ""  # A: SATCAT country filter (e.g. US)
     meta: dict = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
     feeder: Any = None  # Optional[LiveFeeder]
@@ -157,12 +166,22 @@ class StudioState:
         return self.feeder.status()
 
 
-def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict) -> None:
+def _json_response(
+    handler: BaseHTTPRequestHandler,
+    code: int,
+    payload: dict,
+    *,
+    etag: Optional[str] = None,
+) -> None:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     handler.send_response(code)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Cache-Control", "no-store")
+    if etag:
+        handler.send_header("ETag", etag)
+        handler.send_header("Cache-Control", "private, max-age=0, must-revalidate")
+    else:
+        handler.send_header("Cache-Control", "no-store")
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.end_headers()
     handler.wfile.write(body)
@@ -227,16 +246,29 @@ def create_handler(state: StudioState):
             if path == "/api/version":
                 from engine.sla import SLA_USABLE_SATS, SLA_VERSION
 
+                ver = int(state.amap.get_export_version())
+                etag = f'W/"v{ver}"'
+                inm = (self.headers.get("If-None-Match") or "").strip()
+                if inm and inm == etag:
+                    self.send_response(304)
+                    self.send_header("ETag", etag)
+                    self.send_header("Cache-Control", "private, max-age=0, must-revalidate")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    return
                 _json_response(
                     self,
                     200,
                     {
                         "status": "ok",
-                        "version": state.amap.get_export_version(),
+                        "version": ver,
                         "sla_version": SLA_VERSION,
                         "design_sats": SLA_USABLE_SATS,
                         "sla_path": "/api/sla",
+                        "fleet": state.fleet,
+                        "country": state.country or "",
                     },
+                    etag=etag,
                 )
                 return
             if path == "/api/sla":
@@ -285,6 +317,7 @@ def create_handler(state: StudioState):
                         feeder_st["sla"] = getattr(state.feeder, "sla_interval", None)
                 from engine.sla import SLA_USABLE_SATS
 
+                summ = state.amap.summary()
                 payload = {
                     "status": "ok",
                     "data": {
@@ -295,6 +328,9 @@ def create_handler(state: StudioState):
                         "using": state.using,
                         "limit": state.limit,
                         "fleet": state.fleet,
+                        "country": state.country or "",
+                        "countries": summ.get("countries") or {},
+                        "fleets": summ.get("fleets") or {},
                         "project": "Cynober Studio",
                         "feeder": feeder_st,
                         "design_sats": SLA_USABLE_SATS,
@@ -307,7 +343,8 @@ def create_handler(state: StudioState):
                     payload["sla_shape_issues"] = issues
                 else:
                     payload["sla_shape_ok"] = True
-                _json_response(self, 200, payload)
+                ver = int(state.amap.get_export_version())
+                _json_response(self, 200, payload, etag=f'W/"data-v{ver}"')
                 return
             if path == "/api/filter":
                 shell = (qs.get("shell") or ["all"])[0]
@@ -546,9 +583,13 @@ def create_handler(state: StudioState):
                     "p90": _pct(90),
                     "top_cells": top,
                     "shells": summ.get("shells") or {},
+                    "fleets": summ.get("fleets") or {},
+                    "countries": summ.get("countries") or {},
                     "version": summ.get("version"),
                     "src": state.src,
                     "using": state.using,
+                    "fleet": state.fleet,
+                    "country": state.country or "",
                 }
                 # H5: attach geo summary when positions available
                 if (qs.get("geo") or ["1"])[0] not in ("0", "false", "no"):
@@ -561,6 +602,38 @@ def create_handler(state: StudioState):
                     except Exception as e:
                         log.warning("analyze geo: %s", e)
                 _json_response(self, 200, {"status": "ok", "data": payload})
+                return
+            if path == "/api/timeline":
+                from adapters.snapshot_store import SnapshotStore
+                from engine.analytics import compare_density, timeline_from_store
+
+                store = SnapshotStore(
+                    Path(state.snapshot_dir),
+                    retention_days=state.snapshot_retention_days,
+                )
+                a_id = (qs.get("a") or qs.get("compare_a") or [None])[0]
+                b_id = (qs.get("b") or qs.get("compare_b") or [None])[0]
+                if a_id and b_id:
+                    try:
+                        pa, pb = store.load_raw(str(a_id)), store.load_raw(str(b_id))
+                        data = compare_density(pa, pb)
+                        _json_response(self, 200, {"status": "ok", "data": data})
+                    except Exception as e:
+                        log.warning("timeline compare: %s", e)
+                        _json_response(
+                            self, 404, {"status": "error", "message": str(e)}
+                        )
+                    return
+                try:
+                    limit = int((qs.get("limit") or ["40"])[0])
+                except ValueError:
+                    limit = 40
+                frames = timeline_from_store(store, limit=limit)
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": {"n": len(frames), "frames": frames}},
+                )
                 return
             if path == "/api/geo":
                 from engine.solar import assess_geo_from_amap, short_geo_line
@@ -665,7 +738,7 @@ def create_handler(state: StudioState):
                 )
                 return
             if path == "/api/fleet":
-                # H7: switch fleet and rebuild map from public catalog
+                # H7/A: switch fleet (+ optional country) and rebuild map
                 body = _read_json_body(self)
                 fleet = str(body.get("fleet") or body.get("id") or "").strip()
                 if not fleet:
@@ -675,10 +748,15 @@ def create_handler(state: StudioState):
                         {"status": "error", "message": "fleet required"},
                     )
                     return
+                country = str(body.get("country") or "").strip() or None
                 try:
                     from engine.build import build_map
 
-                    limit = int(body.get("limit") if body.get("limit") is not None else state.limit)
+                    limit = int(
+                        body.get("limit")
+                        if body.get("limit") is not None
+                        else state.limit
+                    )
                     store, amap, use, src = build_map(
                         limit=limit,
                         hot_only=True,
@@ -686,6 +764,8 @@ def create_handler(state: StudioState):
                         cache=state.cache,
                         backend="python",
                         fleet=fleet,
+                        country=country,
+                        satcat=True,
                     )
                     state.amap = amap
                     state.catalog = list(use)
@@ -693,6 +773,13 @@ def create_handler(state: StudioState):
                     state.using = len(use)
                     state.limit = limit
                     state.fleet = fleet
+                    state.country = country or ""
+                    log.info(
+                        "fleet switch fleet=%s country=%s using=%s",
+                        fleet,
+                        country,
+                        state.using,
+                    )
                     _json_response(
                         self,
                         200,
@@ -700,6 +787,7 @@ def create_handler(state: StudioState):
                             "status": "ok",
                             "data": {
                                 "fleet": fleet,
+                                "country": state.country,
                                 "src": src,
                                 "using": state.using,
                                 "limit": state.limit,
@@ -709,6 +797,7 @@ def create_handler(state: StudioState):
                         },
                     )
                 except Exception as e:
+                    log.exception("fleet switch failed")
                     _json_response(
                         self,
                         502,
@@ -981,11 +1070,18 @@ def run_studio(
     handler = create_handler(state)
     httpd = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
+    log.info("Studio listening %s", url)
     print(f"Cynober Studio  {url}")
-    print(f"  TLE={state.src}  sats={state.using}  limit={state.limit}  version={state.amap.version}")
+    print(
+        f"  TLE={state.src}  fleet={state.fleet}  country={state.country or '—'}  "
+        f"sats={state.using}  limit={state.limit}  version={state.amap.version}"
+    )
     if state.feeder is not None:
         print(f"  feeder: interval={state.feeder.interval_sec}s running={state.feeder.running}")
-    print("  API: /api/version  /api/data  /api/filter  /api/feeder  POST /api/refresh")
+    print(
+        "  API: /api/version  /api/data  /api/timeline  /api/fleets  "
+        "/api/filter  /api/feeder  POST /api/refresh|/api/fleet"
+    )
     print("  Ctrl+C to stop")
     if open_browser:
         try:
