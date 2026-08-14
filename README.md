@@ -1,6 +1,7 @@
 # Cynober Studio
 
-**Private product** — visual research studio for thermal atoms on public satellite catalogs (Starlink and multi-fleet).
+Visual research studio for thermal atoms on public satellite catalogs (Starlink and multi-fleet).  
+**License:** [MIT](LICENSE).
 
 Standalone like **Cynober DB**: own substrate + engine. **KarmazynOs is optional** (native slab, Lua tools).
 
@@ -13,7 +14,8 @@ CLI default sample **400**. Capacity: `python tests\test_capacity.py`.
 
 | Doc | Content |
 |-----|---------|
-| [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | Instrukcja obsługi (wszystkie funkcje UI + CLI) |
+| [`docs/USER_GUIDE.en.md`](docs/USER_GUIDE.en.md) | User guide (all UI + CLI) |
+| [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | Instrukcja obsługi (PL) |
 | [`docs/CLI.md`](docs/CLI.md) | Full CLI subcommands & flags |
 | [`docs/HAZARD_LAYER.md`](docs/HAZARD_LAYER.md) | Solar H0–H8 · multi-fleet H7 · UX |
 | [`docs/STARLINK_ATOMS.md`](docs/STARLINK_ATOMS.md) | Engine contract & layout |
@@ -123,6 +125,7 @@ python main.py studio --studio-mode 3d --live-feed --interval 30 --open-browser
 | `GET /api/resonance` · `POST /api/system_tick` | HRR browse · decisions |
 | `GET/POST /api/attention` | live root · commit vacuum · restore |
 | `GET /api/export` | JSON / MD download |
+| `GET /api/alert` | EM storm watch (public Kp/flare now or 6h) |
 | `POST /api/rpc/push` · `pull` | optional Cynober DB |
 
 stdlib only (no Flask). Quality: [`docs/CODE_REVIEW.md`](docs/CODE_REVIEW.md).

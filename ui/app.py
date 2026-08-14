@@ -35,6 +35,7 @@ Cynober Studio HTTP server (stdlib only).
   POST /api/fleet     → {fleet, country?} switch catalog (rebuild map)
   GET  /api/timeline  → B snapshot timeline metrics
   GET  /api/timeline/compare?a=&b= → density delta between snapshots
+  GET  /api/alert     → EM storm watch (Kp/flare now or 6h) + crowding counts
 """
 from __future__ import annotations
 
@@ -773,6 +774,29 @@ def create_handler(state: StudioState):
                 geo = assess_geo_from_amap(state.amap)
                 data = geo.as_dict()
                 data["badge"] = short_geo_line(geo)
+                _json_response(self, 200, {"status": "ok", "data": data})
+                return
+            if path == "/api/alert":
+                from engine.event_alert import assess_event_alert
+
+                offline = (qs.get("offline") or ["0"])[0] in ("1", "true", "yes")
+                weather = None
+                predict = None
+                try:
+                    from engine.solar import (
+                        assess_from_amap,
+                        get_space_weather,
+                        predict_horizons,
+                    )
+
+                    wx = get_space_weather(offline=offline)
+                    weather = assess_from_amap(state.amap, wx)
+                    predict = predict_horizons(wx)
+                except Exception as e:
+                    log.warning("alert weather: %s", e)
+                data = assess_event_alert(
+                    state.amap, weather=weather, predict=predict
+                )
                 _json_response(self, 200, {"status": "ok", "data": data})
                 return
             if path == "/api/fleets":

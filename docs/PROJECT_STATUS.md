@@ -24,7 +24,6 @@ Research workbench for public satellite density + solar context on a thermal-ato
 - Operational SSA / mission certification  
 - Edit-atoms, agent sat evolution  
 - Native Rust slab in Studio path  
-- Public open-source release  
 - Space-Track authenticated feeds  
 
 ## Optional later (only if needed)
@@ -44,4 +43,4 @@ python main.py --fleet starlink --country US --limit 200
 
 Docs: [CLI.md](CLI.md) · [HAZARD_LAYER.md](HAZARD_LAYER.md) · [README.md](../README.md)
 
-**Private** — Maciej-EriAmo/cynober_studio  
+**MIT** — [Maciej-EriAmo/cynober_studio](https://github.com/Maciej-EriAmo/cynober_studio)  

@@ -122,7 +122,8 @@ python main.py --rpc-health
 
 ## Related docs
 
-- [USER_GUIDE.md](USER_GUIDE.md) — instrukcja obsługi (UI + CLI)  
+- [USER_GUIDE.en.md](USER_GUIDE.en.md) — user guide (EN)  
+- [USER_GUIDE.md](USER_GUIDE.md) — instrukcja obsługi (PL)  
 - [HAZARD_LAYER.md](HAZARD_LAYER.md) — H0–H8 solar + geo + UX  
 - [STARLINK_ATOMS.md](STARLINK_ATOMS.md) — engine contract  
 - [SLA_50K.md](SLA_50K.md) — scale budgets  

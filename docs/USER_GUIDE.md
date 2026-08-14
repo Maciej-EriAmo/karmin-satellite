@@ -3,7 +3,8 @@
 **UI language: English.** Etykiety przycisków poniżej są takie, jak na ekranie.  
 To jest prywatny warsztat badawczy: gęstość publicznych katalogów TLE + kontekst słoneczny na atomach termicznych. **Nie jest** operacyjnym SSA, certyfikatem radiacyjnym ani Space-Track.
 
-Wejście: `http://127.0.0.1:8765/` · CLI: [`CLI.md`](CLI.md) · status: [`PROJECT_STATUS.md`](PROJECT_STATUS.md)
+Wejście: `http://127.0.0.1:8765/` · CLI: [`CLI.md`](CLI.md) · status: [`PROJECT_STATUS.md`](PROJECT_STATUS.md)  
+English: [`USER_GUIDE.en.md`](USER_GUIDE.en.md)
 
 ---
 
@@ -229,3 +230,17 @@ python tests\test_bench.py
 - Stosowania `cool_hint` z Fleet log — to tylko dziennik  
 
 Gęstość (`density`) jest SoT wizualizacji. Reach / Ghost / Impact / Fleet log to warstwy obok, nie drugi silnik orbity.
+
+---
+
+## 12. Czerwony pasek — burza elektromagnetyczna
+
+Zwykły próg na publicznych indeksach NOAA SWPC, teraz albo na horyzoncie 6h (H3):
+
+- Kp ≥ 5, albo
+- rozbłysk M/X, albo
+- score ≥ 55
+
+Bez dodatkowego równania. Nie magnetometr, nie detekcja z mapy satelitów.
+
+Nachodzenie ops∩debris jest w API jako `crowding` (licznik) i **nie** zapala paska.

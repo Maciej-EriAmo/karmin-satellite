@@ -3,7 +3,8 @@
 | Doc | Audience | Content |
 |-----|----------|---------|
 | [../README.md](../README.md) | all | Product overview, quick start, API table |
-| [USER_GUIDE.md](USER_GUIDE.md) | human | Instrukcja obsługi wszystkich funkcji UI + CLI |
+| [USER_GUIDE.en.md](USER_GUIDE.en.md) | human | User guide (EN) |
+| [USER_GUIDE.md](USER_GUIDE.md) | human | Instrukcja obsługi (PL) |
 | [CLI.md](CLI.md) | agent / power user | Subcommands & flags |
 | [HAZARD_LAYER.md](HAZARD_LAYER.md) | research / agent | Solar H0–H8, multi-fleet H7, adaptive UX |
 | [STARLINK_ATOMS.md](STARLINK_ATOMS.md) | developer | Engine contract, layout, tests |
@@ -15,4 +16,4 @@
 | [CODE_REVIEW.md](CODE_REVIEW.md) | quality | Review notes |
 | [CYNOBER_STUDIO_AUDIT.md](CYNOBER_STUDIO_AUDIT.md) | archive | Historical audit |
 
-**Private product** — Maciej-EriAmo/cynober_studio.
+**MIT** — [Maciej-EriAmo/cynober_studio](https://github.com/Maciej-EriAmo/cynober_studio).

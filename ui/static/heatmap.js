@@ -944,6 +944,25 @@
     setText("err", "");
     loadGeo().catch(() => {});
     loadGhost().catch(() => {});
+    loadEventAlert().catch(() => {});
+  }
+
+  function renderEventAlert(data) {
+    const bar = $("event-alert");
+    const line = $("event-alert-line");
+    if (!bar) return;
+    if (data && data.alert) {
+      bar.hidden = false;
+      if (line) line.textContent = data.line || "EM storm watch";
+    } else {
+      bar.hidden = true;
+      if (line) line.textContent = (data && data.line) || "quiet";
+    }
+  }
+
+  async function loadEventAlert() {
+    const j = await fetchJSON("/api/alert");
+    renderEventAlert(j.data || {});
   }
 
   async function loadFleetList() {
