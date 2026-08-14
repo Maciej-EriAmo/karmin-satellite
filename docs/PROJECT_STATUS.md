@@ -1,6 +1,6 @@
 # Cynober Studio — project status
 
-**Status: COMPLETE / maintenance** (closed 2026-08-12)
+**Status: COMPLETE** (2026-08-14) — product closed. No open tracks.
 
 Research workbench for public satellite density + solar context on a thermal-atom substrate.
 
@@ -14,7 +14,10 @@ Research workbench for public satellite density + solar context on a thermal-ato
 | **A** | SATCAT / country filter (`engine/satcat.py`, `--country`, UI) |
 | **B** | Snapshot timeline + density compare (`engine/analytics.py`, `/api/timeline`) |
 | **C** | EN UI strings, version ETag poll (304), structured logging |
-| **D** | This close-out — no mandatory backlog |
+| **D** | Close-out — no mandatory backlog |
+| **Reach F0+W1–W5** | Session root · ghost · impact · resonance · system tick · [`REACH_STUDIO.md`](REACH_STUDIO.md) |
+| **Live root** | Session-only Store root · vacuum vs ghost · Impact reads `cell.depends_on` |
+| **Debris** | `Load debris` · `--fleet debris` · 5 public Celestrak event clouds |
 
 ## Intentionally out of scope
 

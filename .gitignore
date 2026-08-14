@@ -14,6 +14,7 @@ venv/
 # Runtime / data
 out/*
 !out/.gitkeep
+engine/out/
 *.tle
 *_tle_cache.txt
 *.png

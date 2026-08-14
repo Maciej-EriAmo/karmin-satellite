@@ -54,6 +54,59 @@ header .sub {
   border: 1px solid var(--line);
 }
 
+.badge.reach {
+  color: #c8a0ff;
+  border-color: #4a3060;
+  background: #1a1024;
+}
+.badge.ghost {
+  color: #d0b8ff;
+  border-color: #5a3880;
+  background: #181028;
+}
+.wow-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.7rem;
+  align-items: center;
+  margin: 0 0 0.65rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid #4a3060;
+  background: linear-gradient(90deg, #221033 0%, #16121c 58%);
+}
+.wow-metric {
+  font-size: 0.75rem;
+  color: #9a80b8;
+  letter-spacing: 0.02em;
+}
+.wow-metric b {
+  color: #f0e8ff;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.wow-actions { display: flex; gap: 0.35rem; margin-left: auto; }
+button.wow-on,
+button.wow-toggle.wow-on {
+  background: linear-gradient(180deg, #4a2080, #2a1048);
+  border-color: #a060ff;
+  color: #f4e8ff;
+}
+.limit-presets button.active {
+  border-color: #a060ff;
+  color: #f0e0ff;
+  background: #2a1840;
+}
+.ctl-num {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #120e16;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
 .badge.ok { color: var(--ok); border-color: #1a3a28; background: #122018; }
 .badge.warn { color: #f0c040; border-color: #5a4820; background: #2a2410; }
 .badge.danger { color: #ff6a4a; border-color: #5a2018; background: #2a1010; }
@@ -78,6 +131,73 @@ header .sub {
 }
 .leg-swatch.haz {
   background: linear-gradient(90deg, #1a1040, #c040ff, #ff2040);
+}
+.leg-swatch.ghost {
+  background: linear-gradient(90deg, #2a1848, #7a40c0, #d0b0ff);
+}
+.leg-swatch.impact {
+  background: linear-gradient(90deg, #f0c040, #ff3b1f);
+}
+.leg-swatch.reso {
+  background: linear-gradient(90deg, #104858, #20d0e0);
+}
+.wow-search {
+  min-width: 12rem;
+  flex: 1 1 10rem;
+  max-width: 18rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #4a3060;
+  background: #120e18;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+.wow-search:focus {
+  outline: none;
+  border-color: #20d0e0;
+}
+.live-panel {
+  border-color: #803050;
+  background: linear-gradient(180deg, #2a1020, #16121c);
+}
+.live-panel .impact-kicker { color: #e07090; }
+button#btn-live-wow.wow-on {
+  background: linear-gradient(180deg, #801040, #401020);
+  border-color: #ff4060;
+}
+.decisions-panel {
+  border-color: #2a4850;
+  background: linear-gradient(180deg, #102028, #16121c);
+}
+.decisions-panel .impact-kicker { color: #60b8c8; }
+.impact-panel {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.75rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #6a4020;
+  background: linear-gradient(180deg, #2a1810, #16121c);
+}
+.impact-panel[hidden] { display: none; }
+.impact-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c09050;
+  margin-bottom: 0.25rem;
+}
+.impact-line {
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: #ffe8c8;
+  margin: 0.1rem 0 0.4rem;
+}
+.impact-log {
+  margin: 0;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #d8c4a8;
+  white-space: pre-wrap;
 }
 .leg-swatch.aura {
   background: radial-gradient(circle, transparent 20%, #a02050 70%, #ff2848 100%);

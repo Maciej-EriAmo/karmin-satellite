@@ -22,6 +22,64 @@ class TestCatalogs(unittest.TestCase):
         self.assertEqual(parse_fleet_list("starlink,oneweb"), ["starlink", "oneweb"])
         self.assertEqual(parse_fleet_list("a+b"), ["a", "b"])
         self.assertEqual(get_fleet("oneweb").group, "oneweb")
+        fy = get_fleet("fy1c-debris")
+        urls = fy.urls()
+        self.assertTrue(any("INTDES=1999-025" in u for u in urls))
+        self.assertLess(urls.index(next(u for u in urls if "INTDES=" in u)),
+                        urls.index(next(u for u in urls if "GROUP=" in u)))
+
+    def test_debris_alias_not_in_all(self):
+        from engine.catalogs import (
+            debris_catalog_ids,
+            list_fleets,
+            parse_fleet_list,
+        )
+
+        clouds = debris_catalog_ids()
+        self.assertGreaterEqual(len(clouds), 5)
+        self.assertEqual(parse_fleet_list("debris"), clouds)
+        self.assertEqual(parse_fleet_list("space-debris"), clouds)
+        all_ids = parse_fleet_list("all")
+        for did in clouds:
+            self.assertNotIn(did, all_ids)
+        roles = {f["id"]: f.get("role") for f in list_fleets()}
+        self.assertEqual(roles.get("fy1c-debris"), "debris")
+        self.assertEqual(roles.get("starlink"), "fleet")
+
+    def test_build_map_debris_offline(self):
+        from engine.build import build_map
+
+        _, amap, use, src = build_map(
+            limit=20,
+            hot_only=True,
+            offline_demo=True,
+            fleet="debris",
+            backend="python",
+            satcat=False,
+        )
+        self.assertGreater(len(use), 0)
+        fleets = {s.fleet for s in use}
+        self.assertTrue(any("debris" in f for f in fleets))
+        self.assertTrue("offline-demo" in src)
+        summ = amap.summary()
+        self.assertTrue(any("debris" in k for k in (summ.get("fleets") or {})))
+
+    def test_load_catalog_skips_failed_member(self):
+        from unittest import mock
+
+        from engine.tle import demo_tle_blob, load_catalog
+
+        def fake_load(**kw):
+            fid = kw.get("fleet") or "starlink"
+            if fid == "fy1c-debris":
+                raise RuntimeError("HTTP Error 503: Service Unavailable")
+            return demo_tle_blob(6, fleet=fid), f"ok:{fid}"
+
+        with mock.patch("engine.tle.load_tle_text", side_effect=fake_load):
+            sats, src = load_catalog(fleet="debris", per_fleet_limit=6)
+        self.assertGreater(len(sats), 0)
+        self.assertTrue(any(s.fleet != "fy1c-debris" for s in sats))
+        self.assertIn("fail:fy1c-debris", src)
 
     def test_offline_load_single_and_merge(self):
         from engine.tle import load_catalog

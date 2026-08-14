@@ -7,6 +7,18 @@ Cynober Studio HTTP server (stdlib only).
   GET  /api/version   → {version, sla_version, design_sats}
   GET  /api/sla       → 50k SLA contract (engine/sla.py)
   GET  /api/data      → snapshot() + meta  (cells-scale; no O(N) sat dumps)
+                      · ?reach=1 → density only in session reach (view)
+  GET  /api/reach     → session reach status (counts; no sat dump)
+  POST /api/session   → set_session_scope (rebuild session bindings)
+  GET  /api/ghost     → retained/cold layer in session reach (W2)
+  POST /api/ghost/demo → cool a sample in reach (makes ghost visible)
+  POST /api/impact    → impact_of_cooling (simulate=true default)
+  GET  /api/resonance → W4 HRR/lexical browse (?q=&k=20)
+  POST /api/system_tick → W5 mini tick + decisions
+  GET  /api/decisions → last decision log
+  GET  /api/attention → live root status (session-only GC)
+  POST /api/attention → {live} | {commit} | {restore}
+  GET  /api/export    → download JSON/MD file (?format=json|md&reach=1&sats=1)
   GET  /api/filter    → filter_density(shell, min_count)
   POST /api/refresh   → refresh catalog (optional minutes)
   GET  /api/summary   → summary()
@@ -78,6 +90,7 @@ class StudioState:
     studio_mode: str = "2d"  # 2d | 3d (default UI hint)
     snapshot_dir: str = "out/snapshots"
     snapshot_retention_days: int = 7
+    reach_mode: str = ""  # empty = env CYNOBER_REACH_MODE
 
     def refresh_catalog(
         self,
@@ -88,6 +101,7 @@ class StudioState:
         """Refresh positions; optionally re-fetch / re-parse TLE text."""
         with self.lock:
             if reload_tle:
+                from engine.satcat import SatcatIndex, filter_by_country
                 from engine.tle import load_catalog
 
                 catalog, src = load_catalog(
@@ -98,6 +112,15 @@ class StudioState:
                     limit_hint=self.limit or self.using or 12,
                     cache_ttl_hours=self.cache_ttl_hours,
                 )
+                idx = SatcatIndex(allow_network=not self.offline_demo).load()
+                idx.annotate_sats(catalog)
+                if self.country:
+                    before = len(catalog)
+                    catalog = filter_by_country(catalog, self.country)
+                    src = (
+                        f"{src} · country={self.country.strip().upper()} "
+                        f"({len(catalog)}/{before})"
+                    )
                 if self.limit and self.limit > 0:
                     catalog = catalog[: self.limit]
                 self.catalog = catalog
@@ -123,40 +146,26 @@ class StudioState:
             self.feeder.stop()
 
         def _refresh() -> dict:
+            # offline: still cycle (SGP4 advances with wall clock); never re-fetch TLE
             return self.refresh_catalog(
                 minutes=0.0,
                 reload_tle=reload_tle and not self.offline_demo,
             )
 
-        # offline: still cycle refresh (SGP4 time advances with wall clock)
-        if self.offline_demo:
-            def _refresh_offline() -> dict:
-                return self.refresh_catalog(minutes=0.0, reload_tle=False)
-
-            fn = _refresh_offline
-        else:
-            fn = _refresh
-
         from engine.sla import evaluate_live_interval
 
         sla_iv = evaluate_live_interval(interval_sec)
-        if sla_iv["level"] == "forbidden":
-            log.warning("feeder SLA: %s", sla_iv["message_en"])
-        elif sla_iv["level"] == "warn":
+        if sla_iv["level"] in ("forbidden", "warn"):
             log.warning("feeder SLA: %s", sla_iv["message_en"])
         self.feeder = LiveFeeder(
-            fn,
+            _refresh,
             interval_sec=interval_sec,
             max_fails=max_fails,
             name="studio-feeder",
             refresh_first=refresh_first,
         )
         self.feeder.start()
-        # attach last SLA classification for /api/feeder consumers
-        try:
-            self.feeder.sla_interval = sla_iv  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        self.feeder.sla_interval = sla_iv  # type: ignore[attr-defined]
         return self.feeder
 
     def stop_feeder(self) -> dict:
@@ -187,15 +196,40 @@ def _json_response(
     handler.wfile.write(body)
 
 
+def _download_response(
+    handler: BaseHTTPRequestHandler,
+    body: bytes,
+    *,
+    filename: str,
+    content_type: str,
+) -> None:
+    safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in filename)
+    handler.send_response(200)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Disposition", f'attachment; filename="{safe}"')
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
     length = int(handler.headers.get("Content-Length") or 0)
     if length <= 0:
         return {}
     raw = handler.rfile.read(length)
-    try:
-        return json.loads(raw.decode("utf-8"))
-    except Exception:
+    if not raw or not raw.strip():
         return {}
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as e:
+        raise ValueError(f"invalid json body: {e}") from e
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ValueError("json body must be an object")
+    return data
 
 
 def create_handler(state: StudioState):
@@ -224,6 +258,12 @@ def create_handler(state: StudioState):
         def do_POST(self) -> None:  # noqa: N802
             try:
                 self._dispatch_post()
+            except ValueError as e:
+                _json_response(
+                    self,
+                    400,
+                    {"status": "error", "message": str(e), "data": None},
+                )
             except Exception as e:
                 traceback.print_exc()
                 _json_response(
@@ -299,10 +339,125 @@ def create_handler(state: StudioState):
                     },
                 )
                 return
+            if path == "/api/reach":
+                from engine.reach_studio import reach_status
+
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": reach_status(state.amap, state=state)},
+                )
+                return
+            if path == "/api/resonance":
+                from engine.reach_studio import studio_resonance
+
+                q = (qs.get("q") or qs.get("query") or [""])[0]
+                try:
+                    k = int((qs.get("k") or ["20"])[0])
+                except ValueError:
+                    k = 20
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": studio_resonance(state.amap, q, k=k),
+                    },
+                )
+                return
+            if path == "/api/attention":
+                from engine.reach_studio import attention_status
+
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": attention_status(state.amap),
+                    },
+                )
+                return
+            if path == "/api/decisions":
+                from engine.reach_studio import get_decisions
+
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": {
+                            "log": get_decisions(state.amap),
+                            "version": state.amap.get_export_version(),
+                        },
+                    },
+                )
+                return
+            if path == "/api/ghost":
+                from engine.reach_studio import collect_ghost
+
+                _json_response(
+                    self,
+                    200,
+                    {"status": "ok", "data": collect_ghost(state.amap, state=state)},
+                )
+                return
+            if path == "/api/export":
+                from datetime import datetime, timezone
+
+                from engine.reach_studio import (
+                    build_export_payload,
+                    export_as_markdown,
+                    reach_enabled,
+                )
+
+                fmt = (qs.get("format") or ["json"])[0].strip().lower()
+                if fmt not in ("json", "md", "markdown"):
+                    fmt = "json"
+                want_reach = (qs.get("reach") or ["0"])[0] in ("1", "true", "yes")
+                include_sats = (qs.get("sats") or ["0"])[0] in ("1", "true", "yes")
+                use_reach = bool(want_reach and reach_enabled(state))
+                payload = build_export_payload(
+                    state.amap,
+                    state=state,
+                    reach_only=use_reach,
+                    include_sats=include_sats,
+                    src=state.src,
+                    using=state.using,
+                    fleet=state.fleet,
+                    country=state.country or "",
+                )
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                fleet = (state.fleet or "map").replace(",", "-")[:24]
+                if fmt in ("md", "markdown"):
+                    body = export_as_markdown(payload).encode("utf-8")
+                    _download_response(
+                        self,
+                        body,
+                        filename=f"cynober_{fleet}_{stamp}.md",
+                        content_type="text/markdown; charset=utf-8",
+                    )
+                else:
+                    body = json.dumps(payload, ensure_ascii=False, indent=2).encode(
+                        "utf-8"
+                    )
+                    _download_response(
+                        self,
+                        body,
+                        filename=f"cynober_{fleet}_{stamp}.json",
+                        content_type="application/json; charset=utf-8",
+                    )
+                return
             if path == "/api/data":
                 from engine.sla import assert_api_payload_shape
+                from engine.reach_studio import reach_enabled, reach_status
 
-                snap = state.amap.snapshot()
+                want_reach = (qs.get("reach") or ["0"])[0] in (
+                    "1",
+                    "true",
+                    "yes",
+                )
+                use_reach = bool(want_reach and reach_enabled(state))
+                snap = state.amap.snapshot(reach_only=use_reach)
                 import math
 
                 deg = float(snap.get("grid_deg") or state.amap.grid_deg)
@@ -318,23 +473,34 @@ def create_handler(state: StudioState):
                 from engine.sla import SLA_USABLE_SATS
 
                 summ = state.amap.summary()
+                data_body = {
+                    **snap,
+                    "nlat": nlat,
+                    "nlon": nlon,
+                    "tle_source": state.src,
+                    "using": state.using,
+                    "limit": state.limit,
+                    "fleet": state.fleet,
+                    "country": state.country or "",
+                    "countries": summ.get("countries") or {},
+                    "fleets": summ.get("fleets") or {},
+                    "project": "Cynober Studio",
+                    "feeder": feeder_st,
+                    "design_sats": SLA_USABLE_SATS,
+                }
+                if use_reach:
+                    rst = reach_status(state.amap, state=state)
+                    data_body["reach"] = {
+                        "session": rst.get("session"),
+                        "mode": rst.get("mode"),
+                        "n_sats": rst.get("n_sats"),
+                        "n_cells": rst.get("n_cells"),
+                        "n_reach": rst.get("n_reach"),
+                        "scope": rst.get("scope"),
+                    }
                 payload = {
                     "status": "ok",
-                    "data": {
-                        **snap,
-                        "nlat": nlat,
-                        "nlon": nlon,
-                        "tle_source": state.src,
-                        "using": state.using,
-                        "limit": state.limit,
-                        "fleet": state.fleet,
-                        "country": state.country or "",
-                        "countries": summ.get("countries") or {},
-                        "fleets": summ.get("fleets") or {},
-                        "project": "Cynober Studio",
-                        "feeder": feeder_st,
-                        "design_sats": SLA_USABLE_SATS,
-                    },
+                    "data": data_body,
                 }
                 issues = assert_api_payload_shape(payload, path="/api/data")
                 if issues:
@@ -546,51 +712,17 @@ def create_handler(state: StudioState):
                 _json_response(self, 200, {"status": "ok", "data": items})
                 return
             if path == "/api/analyze":
-                # Lightweight density analytics for Studio (cells-scale, SLA-safe)
-                dens = list((state.amap.density or {}).items())
-                counts = sorted(int(c) for _, c in dens)
-                total = sum(counts)
-                max_c = counts[-1] if counts else 0
-                hot = None
-                for (ilat, ilon), c in dens:
-                    if int(c) == max_c:
-                        hot = {"ilat": ilat, "ilon": ilon, "count": int(c)}
-                        break
-                top = sorted(
-                    (
-                        {"ilat": ilat, "ilon": ilon, "count": int(c)}
-                        for (ilat, ilon), c in dens
-                    ),
-                    key=lambda x: -x["count"],
-                )[:12]
+                from engine.analytics import amap_density_analytics
 
-                def _pct(p: float) -> int:
-                    if not counts:
-                        return 0
-                    i = min(
-                        len(counts) - 1,
-                        max(0, int(round((p / 100.0) * (len(counts) - 1)))),
-                    )
-                    return int(counts[i])
-
-                summ = state.amap.summary()
-                payload = {
-                    "cells": len(counts),
-                    "sum_count": total,
-                    "max_count": max_c,
-                    "hotspot": hot,
-                    "p50": _pct(50),
-                    "p90": _pct(90),
-                    "top_cells": top,
-                    "shells": summ.get("shells") or {},
-                    "fleets": summ.get("fleets") or {},
-                    "countries": summ.get("countries") or {},
-                    "version": summ.get("version"),
-                    "src": state.src,
-                    "using": state.using,
-                    "fleet": state.fleet,
-                    "country": state.country or "",
-                }
+                payload = amap_density_analytics(state.amap)
+                payload.update(
+                    {
+                        "src": state.src,
+                        "using": state.using,
+                        "fleet": state.fleet,
+                        "country": state.country or "",
+                    }
+                )
                 # H5: attach geo summary when positions available
                 if (qs.get("geo") or ["1"])[0] not in ("0", "false", "no"):
                     try:
@@ -730,6 +862,154 @@ def create_handler(state: StudioState):
         def _dispatch_post(self) -> None:
             parsed = urlparse(self.path)
             path = parsed.path or "/"
+            if path == "/api/attention":
+                from engine.reach_studio import (
+                    apply_live_scope,
+                    attention_status,
+                    commit_attention,
+                    restore_catalog,
+                    set_live_root,
+                )
+
+                body = _read_json_body(self)
+                with state.lock:
+                    if body.get("restore") or body.get("live") in (
+                        False,
+                        0,
+                        "0",
+                        "false",
+                        "no",
+                    ):
+                        info = restore_catalog(state.amap, state.catalog)
+                    elif body.get("commit"):
+                        if not getattr(state.amap, "_live_root", False):
+                            set_live_root(state.amap, True)
+                        info = commit_attention(state.amap)
+                    elif body.get("live") in (True, 1, "1", "true", "yes"):
+                        info = set_live_root(state.amap, True)
+                    else:
+                        info = attention_status(state.amap)
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
+            if path == "/api/system_tick":
+                from engine.reach_studio import studio_system_tick
+
+                body = _read_json_body(self)
+                try:
+                    settle = int(body.get("settle_local") or 0)
+                except (TypeError, ValueError):
+                    settle = 0
+                with state.lock:
+                    info = studio_system_tick(
+                        state.amap, settle_local=settle
+                    )
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
+            if path == "/api/impact":
+                from engine.reach_studio import impact_of_cooling
+
+                body = _read_json_body(self)
+                simulate = body.get("simulate", True) not in (
+                    False,
+                    0,
+                    "0",
+                    "false",
+                    "no",
+                )
+                cool_sats = body.get("cool_sats") or body.get("sats") or None
+                if isinstance(cool_sats, str):
+                    cool_sats = [cool_sats]
+                or_shell = str(body.get("or_shell") or body.get("shell") or "")
+                or_fleet = str(body.get("or_fleet") or body.get("fleet") or "")
+                weather = None
+                try:
+                    from engine.solar import get_space_weather
+
+                    weather = get_space_weather(offline=True)
+                except Exception:
+                    weather = None
+                with state.lock:
+                    info = impact_of_cooling(
+                        state.amap,
+                        cool_sats=cool_sats,
+                        or_shell=or_shell,
+                        or_fleet=or_fleet,
+                        simulate=bool(simulate),
+                        weather=weather,
+                    )
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
+            if path == "/api/ghost/demo":
+                from engine.reach_studio import demo_cool_in_reach, reach_enabled
+
+                if not reach_enabled(state):
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "ok",
+                            "data": {"enabled": False, "mode": "off", "cooled": 0},
+                        },
+                    )
+                    return
+                body = _read_json_body(self)
+                try:
+                    n = int(body.get("n") or 8)
+                except (TypeError, ValueError):
+                    n = 8
+                with state.lock:
+                    info = demo_cool_in_reach(state.amap, n=n)
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
+            if path == "/api/session":
+                from engine.reach_studio import (
+                    reach_enabled,
+                    reach_status,
+                    set_session_scope,
+                )
+
+                if not reach_enabled(state):
+                    _json_response(
+                        self,
+                        200,
+                        {
+                            "status": "ok",
+                            "data": reach_status(state.amap, state=state),
+                        },
+                    )
+                    return
+                body = _read_json_body(self)
+                shell = str(body.get("shell") or "all")
+                fleet = str(body.get("fleet") or "")
+                country = str(body.get("country") or "")
+                try:
+                    min_count = int(body.get("min_count") or 1)
+                except (TypeError, ValueError):
+                    min_count = 1
+                with state.lock:
+                    if getattr(state.amap, "_live_root", False):
+                        from engine.reach_studio import apply_live_scope
+
+                        info = apply_live_scope(
+                            state.amap,
+                            state.catalog,
+                            shell=shell,
+                            fleet=fleet,
+                            country=country,
+                            min_count=min_count,
+                        )
+                    else:
+                        info = set_session_scope(
+                            state.amap,
+                            shell=shell,
+                            fleet=fleet,
+                            country=country,
+                            min_count=min_count,
+                        )
+                info["enabled"] = True
+                info["mode"] = reach_status(state.amap, state=state).get("mode")
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
             if path == "/api/refresh":
                 body = _read_json_body(self)
                 minutes = float(body.get("minutes") or 0.0)
@@ -1085,8 +1365,8 @@ def run_studio(
     if state.feeder is not None:
         print(f"  feeder: interval={state.feeder.interval_sec}s running={state.feeder.running}")
     print(
-        "  API: /api/version  /api/data  /api/timeline  /api/fleets  "
-        "/api/filter  /api/feeder  POST /api/refresh|/api/fleet"
+        "  API: /api/version  /api/data  /api/reach  /api/timeline  /api/fleets  "
+        "/api/filter  /api/feeder  POST /api/refresh|/api/fleet|/api/session"
     )
     print("  Ctrl+C to stop")
     if open_browser:
@@ -1104,48 +1384,3 @@ def run_studio(
         state.stop_feeder()
         httpd.server_close()
     return 0
-
-
-def build_and_run(
-    *,
-    limit: int = 400,
-    grid: float = 5.0,
-    hot_only: bool = True,
-    prop: str = "auto",
-    offline_demo: bool = False,
-    cache: str = "out/starlink_tle_cache.txt",
-    backend: str = "python",
-    host: str = "127.0.0.1",
-    port: int = 8765,
-    open_browser: bool = False,
-    live_feed: bool = False,
-    interval_sec: float = 900.0,
-) -> int:
-    from engine.starlink_atoms import build_map
-
-    store, amap, use, src = build_map(
-        limit=limit,
-        grid=grid,
-        hot_only=hot_only,
-        prop=prop,
-        offline_demo=offline_demo,
-        cache=cache,
-        backend=backend,
-    )
-    state = StudioState(
-        amap=amap,
-        catalog=list(use),
-        src=src,
-        using=len(use),
-        limit=int(limit or 0),
-        offline_demo=offline_demo,
-        cache=cache,
-        meta={"store": type(store).__name__},
-    )
-    if live_feed:
-        state.attach_feeder(
-            interval_sec=interval_sec,
-            reload_tle=not offline_demo,
-            refresh_first=False,
-        )
-    return run_studio(state, host=host, port=port, open_browser=open_browser)

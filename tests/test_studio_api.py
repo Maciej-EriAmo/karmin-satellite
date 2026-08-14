@@ -162,11 +162,27 @@ class TestStudioAPI(unittest.TestCase):
         self.assertIn("badge", d)
         self.assertGreater(d["n_with_pos"], 0)
 
+    def test_bad_json_is_400_not_empty_ok(self):
+        req = urllib.request.Request(
+            self.base + "/api/session",
+            data=b"not-json",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=8)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertEqual(body["status"], "error")
+        self.assertIn("json", body["message"].lower())
+
     def test_index_and_static(self):
         with urllib.request.urlopen(self.base + "/", timeout=5) as r:
             self.assertEqual(r.status, 200)
             html = r.read().decode("utf-8")
             self.assertIn("Cynober", html)
+            self.assertIn("btn-load-debris", html)
+            self.assertIn("Load debris", html)
         with urllib.request.urlopen(self.base + "/static/heatmap.js", timeout=5) as r:
             self.assertEqual(r.status, 200)
             js = r.read().decode("utf-8")

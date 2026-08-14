@@ -1,6 +1,7 @@
 """TLE catalog: parse, fetch, cache, offline demo. H7 multi-fleet aware."""
 from __future__ import annotations
 
+import sys
 import time
 import urllib.request
 from dataclasses import dataclass, field
@@ -25,6 +26,11 @@ _DEMO_INC = {
     "stations": 51.6,
     "visual": 60.0,
     "active": 50.0,
+    "fy1c-debris": 98.8,
+    "cosmos-2251-debris": 74.0,
+    "iridium-33-debris": 86.4,
+    "microsat-r-debris": 96.0,
+    "cosmos-1408-debris": 82.0,
 }
 
 
@@ -93,20 +99,34 @@ def parse_tle_catalog(text: str, *, fleet: str = "starlink") -> List[TleSat]:
     return out
 
 
-def fetch_celestrak_urls(urls: Sequence[str], timeout: float = 60.0) -> Tuple[str, str]:
+def fetch_celestrak_urls(
+    urls: Sequence[str],
+    timeout: float = 60.0,
+    *,
+    retries: int = 3,
+) -> Tuple[str, str]:
     headers = {"User-Agent": USER_AGENT, "Accept": "text/plain,*/*"}
     errors: List[str] = []
     for url in urls:
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                text = resp.read().decode("utf-8", "replace")
-            if "1 " in text and "2 " in text:
-                return text, url
-            errors.append(f"{url}: empty/invalid")
-        except Exception as e:
-            errors.append(f"{url}: {e}")
-    raise RuntimeError("Celestrak fetch failed: " + " | ".join(errors))
+        last_err = ""
+        for attempt in range(max(1, int(retries))):
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    text = resp.read().decode("utf-8", "replace")
+                if "1 " in text and "2 " in text:
+                    return text, url
+                last_err = "empty/invalid"
+                break
+            except Exception as e:
+                last_err = str(e)
+                transient = "503" in last_err or "429" in last_err or "502" in last_err
+                if transient and attempt + 1 < retries:
+                    time.sleep(0.4 * (attempt + 1))
+                    continue
+                break
+        errors.append(f"{url}: {last_err}")
+    raise RuntimeError("Celestrak fetch failed: " + " | ".join(errors[:6]))
 
 
 def fetch_starlink_tle(timeout: float = 60.0) -> Tuple[str, str]:
@@ -257,13 +277,20 @@ def load_catalog(
             if legacy.is_file():
                 cpath = legacy
 
-        raw, src = load_tle_text(
-            offline_demo=offline_demo,
-            cache=cpath,
-            limit_hint=limit_hint,
-            cache_ttl_hours=cache_ttl_hours,
-            fleet=fid,
-        )
+        try:
+            raw, src = load_tle_text(
+                offline_demo=offline_demo,
+                cache=cpath,
+                limit_hint=limit_hint,
+                cache_ttl_hours=cache_ttl_hours,
+                fleet=fid,
+            )
+        except Exception as e:
+            if len(ids) == 1:
+                raise
+            print(f"WARN: skip catalog {fid}: {e}", file=sys.stderr)
+            srcs.append(f"fail:{fid} ({e})")
+            continue
         chunk = parse_tle_catalog(raw, fleet=fid)
         if per_fleet_limit is not None and per_fleet_limit > 0:
             chunk = chunk[: int(per_fleet_limit)]
@@ -274,6 +301,13 @@ def load_catalog(
             seen_norad.add(sat.norad)
             all_sats.append(sat)
         srcs.append(src)
+
+    if not all_sats:
+        detail = " | ".join(srcs) if srcs else "no fleets"
+        raise RuntimeError(
+            "Celestrak returned no TLE (all members failed). "
+            f"{detail}. Retry later or use --offline-demo."
+        )
 
     src_s = " | ".join(srcs) if len(srcs) > 1 else (srcs[0] if srcs else "empty")
     if len(ids) > 1:

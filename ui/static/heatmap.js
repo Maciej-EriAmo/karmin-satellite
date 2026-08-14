@@ -9,7 +9,7 @@
     shell: "all",
     minCount: 1,
     pollMs: 5000,
-    layer: "density", // density | hazard | blend
+    layer: "density", // density | hazard | blend | ghost
     hazard: null,
     nlat: 36,
     nlon: 72,
@@ -19,6 +19,17 @@
     country: "",
     loadLimit: 400, // UI slider; 0 = full catalog
     versionEtag: null,
+    reachView: false,
+    reachEnabled: true,
+    ghost: null,
+    ghostUnder: true,
+    sotCells: 0,
+    impactHighlight: null,
+    lastImpact: null,
+    resoHighlight: null,
+    lastTick: null,
+    liveRoot: false,
+    attention: null,
   };
 
   function readLoadLimit() {
@@ -41,13 +52,22 @@
       r.disabled = lim === 0;
       if (lim > 0) {
         const lo = parseInt(r.min, 10) || 40;
-        const hi = parseInt(r.max, 10) || 5000;
+        const hi = parseInt(r.max, 10) || 50000;
         r.value = String(Math.max(lo, Math.min(hi, lim)));
       }
     }
     if (lab) {
       lab.textContent = lim === 0 ? "full (0)" : String(lim > 0 ? lim : r?.value || 400);
     }
+    const num = $("load-limit-num");
+    if (num) {
+      num.disabled = lim === 0;
+      if (lim > 0) num.value = String(lim);
+    }
+    document.querySelectorAll("#limit-presets [data-limit]").forEach((btn) => {
+      const v = parseInt(btn.getAttribute("data-limit"), 10);
+      btn.classList.toggle("active", lim > 0 && v === lim);
+    });
   }
   // shared with globe.js for shell/min_count + layer handoff
   window.CynoberStudioState = state;
@@ -172,6 +192,11 @@
   }
 
   /** Purple→magenta→red ramp for solar exposure proxy (distinct from density T). */
+  function ghostToRgb(kind) {
+    if (kind === "retained") return [150, 80, 220];
+    return [70, 50, 110];
+  }
+
   function hazardToRgb(exposure, maxExp) {
     const mc = maxExp > 0 ? maxExp : 100;
     const x = Math.max(0, Math.min(1, (exposure || 0) / mc));
@@ -223,7 +248,7 @@
 
   function setLayer(layer) {
     state.layer = layer;
-    ["density", "hazard", "blend"].forEach((L) => {
+    ["density", "hazard", "blend", "ghost"].forEach((L) => {
       const btn = $(`btn-layer-${L}`);
       if (btn) btn.classList.toggle("primary", L === layer);
     });
@@ -231,6 +256,7 @@
       density: "density",
       hazard: "solar exposure (proxy)",
       blend: "density + hazard blend",
+      ghost: "ghost · retained / cold",
     };
     setText("map2d-title", titles[layer] || layer);
     setText(
@@ -239,7 +265,9 @@
         ? "density · solar overlay off"
         : layer === "hazard"
           ? "hazard · density off (research proxy)"
-          : "blend · density hue + exposure weight"
+          : layer === "ghost"
+            ? "ghost · retained TOMB + cold in session reach"
+            : "blend · density hue + exposure weight"
     );
     redrawMap();
   }
@@ -287,6 +315,12 @@
     ctx.fillStyle = "#08060a";
     ctx.fillRect(0, 0, cssW, cssH);
 
+    const ghosts = (state.ghost && state.ghost.cells) || [];
+    const ghostAt = new Map();
+    ghosts.forEach((g) => ghostAt.set(`${g.ilat}:${g.ilon}`, g));
+    const drawGhostUnder =
+      state.ghostUnder && state.layer !== "ghost" && ghosts.length > 0;
+
     const maxC = dens.reduce((m, d) => Math.max(m, d.count || 0), 1);
     const base = baseScoreFromHazard();
     const exposures = dens.map((d) =>
@@ -298,6 +332,21 @@
     const mode = layer || "density";
     const gap = cellPx >= 5 ? 1 : 0;
 
+    const paintGhost = (g, alpha) => {
+      const [r, gv, b] = ghostToRgb(g.kind);
+      ctx.fillStyle = `rgba(${r},${gv},${b},${alpha})`;
+      const x = g.ilon * cellPx;
+      const y = (nlat - 1 - g.ilat) * cellPx;
+      ctx.fillRect(x, y, Math.max(1, cellPx - gap), Math.max(1, cellPx - gap));
+    };
+
+    if (mode === "ghost") {
+      ghosts.forEach((g) => paintGhost(g, g.kind === "retained" ? 0.92 : 0.55));
+    } else if (drawGhostUnder) {
+      ghosts.forEach((g) => paintGhost(g, g.kind === "retained" ? 0.55 : 0.28));
+    }
+
+    if (mode !== "ghost") {
     for (let i = 0; i < dens.length; i++) {
       const d = dens[i];
       const exp = exposures[i];
@@ -323,6 +372,34 @@
       const rh = Math.max(1, ch - gap);
       ctx.fillRect(x, y, rw, rh);
     }
+    }
+
+    const flashes = [state.impactHighlight, state.resoHighlight].filter(Boolean);
+    flashes.forEach((flash) => {
+      if (!flash || flash.until <= Date.now() || !flash.cells || !flash.cells.length) {
+        return;
+      }
+      flash.cells.forEach((c) => {
+        const x = c.ilon * cw;
+        const y = (nlat - 1 - c.ilat) * ch;
+        let stroke;
+        if (flash.kind === "reso") {
+          stroke = "rgba(32,208,224,0.95)";
+        } else {
+          stroke = c.emptied
+            ? "rgba(255,70,36,0.95)"
+            : "rgba(255,196,64,0.9)";
+        }
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = Math.max(1.5, cellPx * 0.2);
+        ctx.strokeRect(
+          x + 0.5,
+          y + 0.5,
+          Math.max(1, cw - gap - 1),
+          Math.max(1, ch - gap - 1)
+        );
+      });
+    });
 
     state._draw = {
       nlat,
@@ -341,6 +418,7 @@
       layer: mode,
       cellPx,
       nSats: nSats || nHot,
+      ghostAt,
     };
 
     const pxInfo = $("map-px-info");
@@ -351,11 +429,6 @@
           : `${cellPx.toFixed(1)}px`;
       pxInfo.textContent = `cell ${pxLabel} · n≈${nSats || nHot} · hot=${nHot}`;
     }
-  }
-
-  /** @deprecated use drawMap */
-  function drawDensity(density, nlat, nlon) {
-    drawMap(density, nlat, nlon, state.layer || "density");
   }
 
   function percentile(sorted, p) {
@@ -384,8 +457,10 @@
     setText("an-sum", sum);
     setText("an-max", maxC);
     if (hot) {
-      const lat0 = -90 + (hot.ilat || 0) * 5;
-      const lon0 = -180 + (hot.ilon || 0) * 5;
+      const degLat = 180 / Math.max(1, state.nlat || 36);
+      const degLon = 360 / Math.max(1, state.nlon || 72);
+      const lat0 = -90 + (hot.ilat || 0) * degLat;
+      const lon0 = -180 + (hot.ilon || 0) * degLon;
       setText(
         "an-hotspot",
         `cell:${hot.ilat}:${hot.ilon} · ~${lat0.toFixed(0)}°,${lon0.toFixed(0)}°`
@@ -462,10 +537,372 @@
     if (cur) sel.value = cur;
   }
 
+  function updateWowBar() {
+    const liveBtn = $("btn-live-wow");
+    if (liveBtn) liveBtn.classList.toggle("wow-on", !!state.liveRoot);
+    const att = state.attention;
+    if (att && att.line) {
+      setText("wow-live", att.live ? att.line : "catalog root");
+    } else {
+      setText("wow-live", state.liveRoot ? "session-only GC" : "catalog root");
+    }
+    const on = !!state.reachView;
+    const btn = $("btn-reach-wow");
+    if (btn) {
+      btn.classList.toggle("wow-on", on);
+      btn.classList.toggle("primary", on);
+      btn.textContent = on ? "Reach ON" : "Reach view";
+    }
+    const t = $("reach-toggle");
+    if (t) t.checked = on;
+    const r = (state.full && state.full.reach) || {};
+    const g = state.ghost || {};
+    const sot =
+      state.sotCells ||
+      (state.full && !state.reachView && state.full.density
+        ? state.full.density.length
+        : 0);
+    if (on && r.n_sats != null) {
+      setText("wow-reach", `${r.n_sats} sats · ${r.n_cells} cells`);
+    } else if (on) {
+      setText("wow-reach", "on");
+    } else {
+      setText("wow-reach", "off · full SoT");
+    }
+    if (g.n_cells != null) {
+      setText(
+        "wow-ghost",
+        `${g.n_cells} cells · ${g.n_sats || 0} sat retained`
+      );
+      setText(
+        "stat-ghost",
+        `${g.n_cells} cells · ret ${g.n_retained || 0} · cold ${g.n_cold || 0}`
+      );
+    } else {
+      setText("wow-ghost", "—");
+      setText("stat-ghost", "—");
+    }
+    const imp = state.lastImpact;
+    if (imp && imp.line) {
+      setText("wow-impact", imp.line);
+    } else {
+      setText("wow-impact", "—");
+    }
+    if (state.lastTick && state.lastTick.n_fleets != null) {
+      setText(
+        "wow-tick",
+        `${state.lastTick.n_fleets} fleets · ${
+          (state.lastTick.decisions || []).length
+        } dec`
+      );
+    }
+    setText("wow-sot", sot ? `${sot} cells` : "—");
+    const badgeG = $("badge-reach");
+    if (badgeG && g.n_cells) badgeG.classList.add("ghost");
+  }
+
+  function updateReachStatus(data) {
+    const on = !!state.reachView;
+    const r = (data && data.reach) || {};
+    const nSats = r.n_sats;
+    const nCells = r.n_cells;
+    const badge = $("badge-reach");
+    if (badge) {
+      badge.classList.toggle("reach", on);
+      if (!state.reachEnabled) {
+        badge.textContent = "reach off";
+      } else if (on && nSats != null) {
+        badge.textContent = `reach: ${nSats} sats · ${nCells} cells`;
+      } else if (on) {
+        badge.textContent = "reach on";
+      } else {
+        badge.textContent = "reach off";
+      }
+    }
+    if (nSats != null) {
+      setText("stat-reach", `${nSats} sats · ${nCells} cells`);
+      setText(
+        "reach-info",
+        `reach: ${nSats} sats · ${nCells} cells`
+      );
+    } else if (!state.reachEnabled) {
+      setText("stat-reach", "flag off");
+      setText("reach-info", "off · product as before (CYNOBER_REACH=0)");
+    } else if (on) {
+      setText("stat-reach", "on");
+      setText("reach-info", "on · session root");
+    } else {
+      setText("stat-reach", "off");
+      setText("reach-info", "off · full density (SoT)");
+    }
+    updateWowBar();
+  }
+
+  async function loadGhost() {
+    try {
+      const j = await fetchJSON("/api/ghost");
+      state.ghost = j.data || null;
+      updateWowBar();
+      if (state.view) redrawMap();
+    } catch (e) {
+      state.ghost = null;
+    }
+  }
+
+  function exportFile(format) {
+    const reach = state.reachView ? "1" : "0";
+    const sats = $("export-sats")?.checked ? "1" : "0";
+    const q = new URLSearchParams({
+      format,
+      reach,
+      sats,
+    });
+    window.location.href = `/api/export?${q}`;
+    setText("snap-info", `download ${format}…`);
+  }
+
+  function renderImpact(data) {
+    state.lastImpact = data;
+    const panel = $("impact-panel");
+    if (panel) panel.hidden = false;
+    setText("impact-line", data.line || "—");
+    const rb = data.reach_before || {};
+    const ra = data.reach_after || {};
+    const haz = data.hazard_delta_estimate || {};
+    const hs = (haz.shells || [])[0];
+    const hazLine = hs
+      ? `${hs.shell}  n ${hs.n_before}→${hs.n_after}  score ${hs.score_before}→${hs.score_after}`
+      : "hazard  —";
+    const log = [
+      data.simulate ? "simulate · density SoT unchanged" : "APPLIED cool · density SoT unchanged",
+      `scope  ${data.or_shell || data.or_fleet || "explicit sats"}`,
+      `−${data.cool_n || 0} sat  ·  ${data.n_affected || 0} cells hit  ·  ${data.n_emptied || 0} emptied`,
+      `reach  ${rb.n_sats ?? "—"} → ${ra.n_sats ?? "—"} sats`,
+      hazLine,
+    ].join("\n");
+    const pre = $("impact-log");
+    if (pre) pre.textContent = log;
+    updateWowBar();
+    const btn = $("btn-impact-wow");
+    if (btn) {
+      btn.classList.add("wow-on");
+      setTimeout(() => btn.classList.remove("wow-on"), 5000);
+    }
+  }
+
+  function flashImpact(data) {
+    const cells = data.affected_cells || [];
+    state.impactHighlight = {
+      kind: "impact",
+      until: Date.now() + 5000,
+      cells,
+    };
+    redrawMap();
+    clearTimeout(state._impactTimer);
+    state._impactTimer = setTimeout(() => {
+      state.impactHighlight = null;
+      redrawMap();
+    }, 5100);
+  }
+
+  function flashResonance(data) {
+    const cells = data.cells || [];
+    state.resoHighlight = {
+      kind: "reso",
+      until: Date.now() + 5000,
+      cells,
+    };
+    redrawMap();
+    clearTimeout(state._resoTimer);
+    state._resoTimer = setTimeout(() => {
+      state.resoHighlight = null;
+      redrawMap();
+    }, 5100);
+  }
+
+  function renderDecisions(data) {
+    state.lastTick = data;
+    const panel = $("decisions-panel");
+    if (panel) panel.hidden = false;
+    const log = data.log || data.decisions || [];
+    const lines = log.slice(-10).map((d) => {
+      const act = (d.action || "?").padEnd(9, " ");
+      return `${act} ${d.node || "?"}  ·  ${d.reason || ""}`;
+    });
+    const pre = $("decisions-log");
+    if (pre) {
+      const head = `settled ${data.ticked ?? 0} tick(s) · advisory log · density SoT`;
+      pre.textContent = [head, ...lines].join("\n") || "no decisions";
+    }
+    updateWowBar();
+    const btn = $("btn-tick-wow");
+    if (btn) {
+      btn.classList.add("wow-on");
+      setTimeout(() => btn.classList.remove("wow-on"), 1600);
+    }
+  }
+
+  async function runResonance(q) {
+    const query = (q || "").trim();
+    if (!query) return;
+    const params = new URLSearchParams({ q: query, k: "20" });
+    const j = await fetchJSON(`/api/resonance?${params}`);
+    const d = j.data || {};
+    setText(
+      "snap-info",
+      `search ${d.mode || "off"} · ${d.n_hits || 0} hits · ${d.n_cells || 0} cells`
+    );
+    flashResonance(d);
+  }
+
+  function renderLive(data) {
+    state.attention = data;
+    state.liveRoot = !!data.live;
+    const panel = $("live-panel");
+    if (panel) panel.hidden = false;
+    setText("live-line", data.line || "—");
+    const log = [
+      `roots     ${(data.roots || []).join(" · ") || "—"}`,
+      `sats      ${data.sats ?? data.remaining_sats ?? "—"}   cells ${data.cells ?? data.remaining_cells ?? "—"}`,
+      `vacuumed  ${data.vacuumed ?? 0}   retained ${data.retained ?? 0}`,
+      `graph     ${data.graph_edges ?? 0} depends_on edges on cell atoms`,
+    ].join("\n");
+    const pre = $("live-log");
+    if (pre) pre.textContent = log;
+    updateWowBar();
+  }
+
+  async function setLiveRoot(on) {
+    const j = await fetchJSON("/api/attention", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(on ? { live: true } : { restore: true }),
+    });
+    renderLive(j.data || {});
+    if (on && state.reachView && state.shell && state.shell !== "all") {
+      await commitLive();
+    } else if (on && !state.reachView) {
+      setReachView(true);
+    } else {
+      await loadData();
+    }
+  }
+
+  async function commitLive() {
+    $("badge-status").textContent = "vacuum…";
+    const j = await fetchJSON("/api/attention", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commit: true }),
+    });
+    renderLive(j.data || {});
+    await loadData();
+    loadGhost().catch(() => {});
+    $("badge-status").textContent = "live";
+  }
+
+  async function runSystemTick() {
+    $("badge-status").textContent = "tick…";
+    const j = await fetchJSON("/api/system_tick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settle_local: 1 }),
+    });
+    renderDecisions(j.data || {});
+    $("badge-status").textContent = "live";
+  }
+
+  async function runImpact() {
+    $("badge-status").textContent = "impact…";
+    const shell = state.shell || "all";
+    const body = { simulate: true };
+    if (shell && shell !== "all") {
+      body.or_shell = String(shell).startsWith("shell:")
+        ? shell
+        : `shell:${shell}`;
+    } else {
+      const shells = (state.full && state.full.shells) || {};
+      const keys = Object.keys(shells);
+      if (keys.length) {
+        body.or_shell = keys.sort((a, b) => (shells[b] || 0) - (shells[a] || 0))[0];
+      }
+    }
+    const j = await fetchJSON("/api/impact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    renderImpact(j.data || {});
+    flashImpact(j.data || {});
+    $("badge-status").textContent = "live";
+  }
+
+  async function demoGhost() {
+    $("badge-status").textContent = "ghost…";
+    const j = await fetchJSON("/api/ghost/demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ n: 8 }),
+    });
+    state.ghost = j.data || null;
+    updateWowBar();
+    setText(
+      "snap-info",
+      `ghost demo · cooled ${j.data?.cooled ?? 0} · cells ${j.data?.n_cells ?? 0}`
+    );
+    redrawMap();
+    $("badge-status").textContent = "live";
+  }
+
+  async function probeReach() {
+    try {
+      const j = await fetchJSON("/api/reach");
+      const d = j.data || {};
+      state.reachEnabled = !!d.enabled;
+      const t = $("reach-toggle");
+      if (t) t.disabled = !state.reachEnabled;
+      const wow = $("btn-reach-wow");
+      if (wow) wow.disabled = !state.reachEnabled;
+      const gd = $("btn-ghost-demo");
+      if (gd) gd.disabled = !state.reachEnabled;
+      if (!state.reachEnabled) {
+        state.reachView = false;
+        if (t) t.checked = false;
+      }
+      updateReachStatus(d.enabled ? { reach: d } : null);
+    } catch (e) {
+      state.reachEnabled = false;
+      const t = $("reach-toggle");
+      if (t) t.disabled = true;
+    }
+  }
+
+  async function postSession() {
+    const shell = state.shell || "all";
+    const minCount = state.minCount || 1;
+    const fleet = state.fleet || "";
+    const country = state.country || "";
+    const j = await fetchJSON("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shell,
+        fleet,
+        country: country || "",
+        min_count: minCount,
+      }),
+    });
+    return j.data || {};
+  }
+
   async function loadData() {
-    const j = await fetchJSON("/api/data");
+    const url = state.reachView ? "/api/data?reach=1" : "/api/data";
+    const j = await fetchJSON(url);
     state.full = j.data;
     state.version = j.data.version || 0;
+    if (!state.reachView && j.data.density) {
+      state.sotCells = j.data.density.length;
+    }
     if (j.data.limit != null) {
       syncLoadLimitUI(j.data.limit);
     }
@@ -489,14 +926,24 @@
     const countries =
       (j.data.summary && j.data.summary.countries) || j.data.countries || {};
     fillCountrySelect(countries, state.country);
-    // if filter active, re-apply; else full
-    if (state.shell !== "all" || state.minCount > 1) {
+    if (state.reachView) {
+      drawFromPayload(j.data);
+      updateReachStatus(j.data);
+      const sc = (j.data.reach && j.data.reach.scope) || {};
+      setText(
+        "filter-info",
+        `${sc.shell || state.shell || "all"} · min≥${sc.min_count || state.minCount || 1} · reach`
+      );
+    } else if (state.shell !== "all" || state.minCount > 1) {
       await applyFilter();
+      updateReachStatus(null);
     } else {
       drawFromPayload(j.data);
+      updateReachStatus(null);
     }
     setText("err", "");
     loadGeo().catch(() => {});
+    loadGhost().catch(() => {});
   }
 
   async function loadFleetList() {
@@ -517,9 +964,13 @@
       merge.value = "starlink,oneweb";
       merge.textContent = "Starlink + OneWeb (merge)";
       sel.appendChild(merge);
+      const debris = document.createElement("option");
+      debris.value = "debris";
+      debris.textContent = "Public debris (5 event clouds)";
+      sel.appendChild(debris);
       const all = document.createElement("option");
       all.value = "all";
-      all.textContent = "All curated fleets (merge, no active)";
+      all.textContent = "All curated fleets (merge, no active / no debris)";
       sel.appendChild(all);
       if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
       else if (String(cur).includes(",")) {
@@ -541,10 +992,10 @@
     }
   }
 
-  async function applyFleet() {
+  async function applyFleet(fleetOverride) {
     const sel = $("fleet-select");
     const csel = $("country-select");
-    const fleet = (sel && sel.value) || "starlink";
+    const fleet = fleetOverride || (sel && sel.value) || "starlink";
     const country = (csel && csel.value) || "";
     const limit = readLoadLimit();
     const limitLabel = limit === 0 ? "full" : String(limit);
@@ -578,6 +1029,9 @@
       );
       if (j.data.summary && j.data.summary.countries) {
         fillCountrySelect(j.data.summary.countries, state.country);
+      }
+      if (state.reachView) {
+        await postSession();
       }
       await loadData();
       if (
@@ -641,6 +1095,11 @@
   async function applyFilter() {
     const shell = state.shell || "all";
     const minCount = state.minCount || 1;
+    if (state.reachView && state.reachEnabled) {
+      await postSession();
+      await loadData();
+      return;
+    }
     if (shell === "all" && minCount <= 1 && state.full) {
       drawFromPayload(state.full);
       return;
@@ -804,13 +1263,12 @@
     else el.classList.add("ok");
   }
 
-  /** H8: edge aura strength 0..1 from solar stress score + severity. */
+  /** H8: edge aura from real solar score. No invented glow without weather. */
   function applyEdgeAura(score, severity) {
     const s = Number(score);
-    // quiet ~0.25, watch ~0.55, warning ~0.85+
-    let strength = 0.28;
-    if (!Number.isNaN(s)) {
-      strength = Math.max(0.22, Math.min(0.95, 0.18 + (s / 100) * 0.85));
+    let strength = 0;
+    if (score != null && !Number.isNaN(s)) {
+      strength = Math.max(0, Math.min(0.95, (s / 100) * 0.85));
     }
     const sev = String(severity || "INFO").toUpperCase();
     if (sev === "WARNING") strength = Math.max(strength, 0.72);
@@ -848,7 +1306,8 @@
       const fc = w.flare_class || "?";
       const f107 = w.f107 != null ? Number(w.f107).toFixed(0) : "—";
       const kp = w.kp != null ? Number(w.kp).toFixed(1) : "—";
-      badgeWx.textContent = `solar ${fc} · F${f107} · Kp ${kp}`;
+      const wxMode = w.mode && w.mode !== "live" ? ` · ${w.mode}` : "";
+      badgeWx.textContent = `solar ${fc} · F${f107} · Kp ${kp}${wxMode}`;
       setHazardBadgeClass(badgeWx, data.severity);
     }
     const badgeHz = $("badge-hazard");
@@ -993,17 +1452,23 @@
       const ilat = d.nlat - 1 - Math.floor(y);
       const idx = d.density.findIndex((c) => c.ilat === ilat && c.ilon === ilon);
       const cell = idx >= 0 ? d.density[idx] : null;
-      if (!cell) {
+      const gh0 = d.ghostAt && d.ghostAt.get(`${ilat}:${ilon}`);
+      if (!cell && !gh0) {
         tip.classList.remove("show");
         return;
       }
       const lat0 = -90 + ilat * (180 / d.nlat);
       const lon0 = -180 + ilon * (360 / d.nlon);
       const exp =
-        d.exposures && d.exposures[idx] != null
+        idx >= 0 && d.exposures && d.exposures[idx] != null
           ? Number(d.exposures[idx]).toFixed(1)
           : "—";
-      tip.innerHTML = `<b>cell:${ilat}:${ilon}</b><br/>count=${cell.count}<br/>exposure≈${exp}<br/>≈ ${lat0.toFixed(
+      const gh = gh0;
+      const ghostLine = gh
+        ? `<br/>${gh.kind} · T=${gh.T} · in session reach`
+        : "";
+      const count = cell ? cell.count : "—";
+      tip.innerHTML = `<b>cell:${ilat}:${ilon}</b><br/>count=${count}<br/>exposure≈${exp}${ghostLine}<br/>≈ ${lat0.toFixed(
         1
       )}°, ${lon0.toFixed(1)}°`;
       tip.style.left = `${ev.clientX - rect.left + 12}px`;
@@ -1033,6 +1498,13 @@
     });
     $("btn-load-sats")?.addEventListener("click", () => {
       applyFleet().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-load-debris")?.addEventListener("click", () => {
+      const sel = $("fleet-select");
+      if (sel && [...sel.options].some((o) => o.value === "debris")) {
+        sel.value = "debris";
+      }
+      applyFleet("debris").catch((e) => setText("err", String(e.message || e)));
     });
     $("btn-fleet-apply")?.addEventListener("click", () => {
       applyFleet().catch((e) => setText("err", String(e.message || e)));
@@ -1064,17 +1536,109 @@
     $("btn-layer-density")?.addEventListener("click", () => setLayer("density"));
     $("btn-layer-hazard")?.addEventListener("click", () => setLayer("hazard"));
     $("btn-layer-blend")?.addEventListener("click", () => setLayer("blend"));
+    $("btn-layer-ghost")?.addEventListener("click", () => setLayer("ghost"));
     $("btn-reset")?.addEventListener("click", () => {
       state.shell = "all";
       state.minCount = 1;
       const r = $("min-count");
       if (r) r.value = "1";
       setText("min-count-val", "1");
-      if (state.full) drawFromPayload(state.full);
       setText("filter-info", "all · min≥1");
       // re-check all radio
       const all = document.querySelector('input[name="shell"][value="all"]');
       if (all) all.checked = true;
+      if (state.reachView) {
+        applyFilter().catch((e) => setText("err", String(e.message || e)));
+      } else if (state.full) {
+        drawFromPayload(state.full);
+      }
+    });
+    function setReachView(on) {
+      state.reachView = !!on && state.reachEnabled;
+      const t = $("reach-toggle");
+      if (t) t.checked = state.reachView;
+      updateWowBar();
+      if (state.reachView) {
+        applyFilter().catch((e) => setText("err", String(e.message || e)));
+      } else {
+        loadData().catch((e) => setText("err", String(e.message || e)));
+      }
+    }
+    $("reach-toggle")?.addEventListener("change", (ev) => {
+      setReachView(!!ev.target.checked);
+    });
+    $("btn-live-wow")?.addEventListener("click", () => {
+      setLiveRoot(!state.liveRoot).catch((e) =>
+        setText("err", String(e.message || e))
+      );
+    });
+    $("btn-commit-wow")?.addEventListener("click", () => {
+      commitLive().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-restore-wow")?.addEventListener("click", () => {
+      setLiveRoot(false).catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-reach-wow")?.addEventListener("click", () => {
+      setReachView(!state.reachView);
+    });
+    $("btn-impact-wow")?.addEventListener("click", () => {
+      runImpact().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-impact")?.addEventListener("click", () => {
+      runImpact().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-tick-wow")?.addEventListener("click", () => {
+      runSystemTick().catch((e) => setText("err", String(e.message || e)));
+    });
+    const reso = $("resonance-q");
+    if (reso) {
+      reso.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          runResonance(reso.value).catch((e) =>
+            setText("err", String(e.message || e))
+          );
+        }
+      });
+    }
+    $("ghost-under")?.addEventListener("change", (ev) => {
+      state.ghostUnder = !!ev.target.checked;
+      redrawMap();
+    });
+    $("btn-ghost-demo")?.addEventListener("click", () => {
+      demoGhost().catch((e) => setText("err", String(e.message || e)));
+    });
+    const doExport = (fmt) => exportFile(fmt);
+    $("btn-export-json")?.addEventListener("click", () => doExport("json"));
+    $("btn-export-md")?.addEventListener("click", () => doExport("md"));
+    $("btn-export-json-wow")?.addEventListener("click", () => doExport("json"));
+    $("btn-export-md-wow")?.addEventListener("click", () => doExport("md"));
+    document.querySelectorAll("#limit-presets [data-limit]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const full = $("load-limit-full");
+        if (full) full.checked = false;
+        const v = parseInt(btn.getAttribute("data-limit"), 10);
+        if (Number.isFinite(v)) syncLoadLimitUI(v);
+      });
+    });
+    $("load-limit-num")?.addEventListener("change", () => {
+      const num = $("load-limit-num");
+      const v = parseInt(num && num.value, 10);
+      if (Number.isFinite(v)) {
+        syncLoadLimitUI(Math.max(40, Math.min(50000, v)));
+      }
+    });
+    $("fleet-select")?.addEventListener("change", () => {
+      if (!state.reachView) return;
+      const sel = $("fleet-select");
+      state.fleet = (sel && sel.value) || state.fleet;
+      applyFilter().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("country-select")?.addEventListener("change", () => {
+      if (!state.reachView) return;
+      const csel = $("country-select");
+      state.country = (csel && csel.value) || "";
+      applyFilter().catch((e) => setText("err", String(e.message || e)));
     });
     const range = $("min-count");
     if (range) {
@@ -1090,6 +1654,12 @@
     listSnapshots().catch(() => {});
     loadFleetList().catch(() => {});
     loadTimeline().catch(() => {});
+    fetchJSON("/api/rpc/status")
+      .then((j) => {
+        const btn = $("btn-rpc-push");
+        if (btn && j.data && j.data.available) btn.hidden = false;
+      })
+      .catch(() => {});
     // re-fit adaptive cells when panel width changes
     let _rz = null;
     window.addEventListener("resize", () => {
@@ -1098,13 +1668,14 @@
         if (state.view) redrawMap();
       }, 120);
     });
-    // default edge aura visible even before weather fetch
-    applyEdgeAura(25, "INFO");
+    applyEdgeAura(null, "");
     loadWeatherHazard(false).catch(() => {
       setText("badge-weather", "solar offline");
-      applyEdgeAura(25, "INFO");
+      applyEdgeAura(null, "");
     });
-    loadData()
+    probeReach()
+      .catch(() => {})
+      .then(() => loadData())
       .catch((e) => setText("err", String(e.message || e)))
       .then(() => {
         setInterval(() => {

@@ -118,11 +118,11 @@ def _resolve_base_score(
     *,
     shell: str = "all",
     base_score: Optional[float] = None,
-) -> Tuple[float, str]:
+) -> Tuple[Optional[float], str]:
     if base_score is not None:
         return float(base_score), "INFO"
     if assessment is None:
-        return 20.0, "INFO"
+        return None, "NONE"
     try:
         from engine.solar.hazard import base_score_for_shell, severity_for_score
 
@@ -139,7 +139,9 @@ def _resolve_base_score(
         g = getattr(assessment, "global_score", None)
         if g is None and isinstance(assessment, dict):
             g = assessment.get("global_score")
-        return float(g if g is not None else 20.0), "INFO"
+        if g is None:
+            return None, "NONE"
+        return float(g), "INFO"
 
 
 def export_sphere_data(
@@ -208,11 +210,20 @@ def export_sphere_data(
     max_c = max(1, int(max_c))
 
     need_rad = layer_key in ("radiation", "blend")
-    bscore, severity = (20.0, "INFO")
+    bscore, severity = (0.0, "NONE")
+    solar_available = False
     if need_rad:
-        bscore, severity = _resolve_base_score(
+        got, severity = _resolve_base_score(
             assessment, shell=shell, base_score=base_score
         )
+        if got is None:
+            # do not invent a radiation field — show density and say so
+            layer_key = "density"
+            need_rad = False
+            severity = "NONE"
+        else:
+            bscore = float(got)
+            solar_available = True
 
     cells: List[dict] = []
     dateline_cells = 0
@@ -280,16 +291,17 @@ def export_sphere_data(
         "shells": shells,
         "stats": summary,
         "solar": {
-            "base_score": round(bscore, 2) if need_rad else None,
-            "severity": severity if need_rad else None,
+            "available": solar_available,
+            "base_score": round(bscore, 2) if solar_available else None,
+            "severity": severity if solar_available else None,
             "shell": shell if shell not in ("", "*") else "all",
             "max_exposure": max_exp,
             "mean_exposure": mean_exp,
             "note": (
-                "3D radiation = solar score × density weight; "
+                "3D exposure = solar score × density weight; "
                 "research proxy, not physical dose."
-                if need_rad
-                else "density thermal layer"
+                if solar_available
+                else "density thermal layer (no weather — not radiation)"
             ),
         },
         "meta": {

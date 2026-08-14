@@ -35,7 +35,7 @@ Removed flag soup: `--weather` / `--predict` / `--hazard` → use subcommands.
 |------|---------|--------|
 | `--limit N` | 400 | `0` = whole catalog (arch ceiling applies) |
 | `--offline-demo` | off | Synthetic TLE (no network) |
-| `--fleet ID` | `starlink` | H7: `oneweb`, `starlink,oneweb`, … |
+| `--fleet ID` | `starlink` | H7: `oneweb`, `starlink,oneweb`, `debris` (5 public Celestrak clouds), … |
 | `--country CC` | — | A: SATCAT/heuristic country (`US`, `UK`, …) |
 | `--no-satcat` | off | skip country annotation |
 | `--hot-only` / `--full-grid` | auto | Auto hot-only when limit≥1000 or 0 |
@@ -59,6 +59,19 @@ Removed flag soup: `--weather` / `--predict` / `--hazard` → use subcommands.
 | `--studio-mode 2d\|3d` | `2d` |
 | `--live-feed` | off |
 | `--interval SEC` | 900 |
+
+### Reach (env — W1)
+
+| Env | Default | Notes |
+|-----|---------|--------|
+| `CYNOBER_REACH` | `1` | `0` = product as before (no session root) |
+| `CYNOBER_REACH_MODE` | `session` | `off` \| `session` \| `ghost` \| `impact` |
+
+Studio UI load limit: **40 … 50 000** (SLA usable) + presets 400 / 2k / 10k / 50k.  
+Export: `GET /api/export?format=json|md`. Ghost: `GET /api/ghost`.  
+Live root: `GET/POST /api/attention` (`live` / `commit` / `restore`) — session-only GC; Impact reads `cell.depends_on`.
+
+See [`REACH_STUDIO.md`](REACH_STUDIO.md).
 
 ### Solar net flags (weather · predict · hazard · report)
 
@@ -109,9 +122,10 @@ python main.py --rpc-health
 
 ## Related docs
 
+- [USER_GUIDE.md](USER_GUIDE.md) — instrukcja obsługi (UI + CLI)  
 - [HAZARD_LAYER.md](HAZARD_LAYER.md) — H0–H8 solar + geo + UX  
 - [STARLINK_ATOMS.md](STARLINK_ATOMS.md) — engine contract  
 - [SLA_50K.md](SLA_50K.md) — scale budgets  
-- [PROJECT_STATUS.md](PROJECT_STATUS.md) — COMPLETE / maintenance  
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) — COMPLETE (2026-08-14)  
 - [README.md](../README.md) — product overview + HTTP API  
 

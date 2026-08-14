@@ -53,8 +53,12 @@ class StarlinkAtomMap:
         self.version: int = 0
         self._shells: Dict[str, int] = {}
         self._shell_index: Dict[str, Set[str]] = {}
+        self._fleet_index: Dict[str, Set[str]] = {}
+        self._reach_session: Any = None
         self._active_cells: Set[Tuple[int, int]] = set()
         self.density: Dict[Tuple[int, int], int] = {}
+        self.cell_to_sats: Dict[Tuple[int, int], Set[str]] = {}
+        self.sat_to_cell: Dict[str, Tuple[int, int]] = {}
         self.last_prop_ms: float = 0.0
         self.last_error_sats: int = 0
         self.last_prop_errors: List[Tuple[int, str]] = []
@@ -77,6 +81,11 @@ class StarlinkAtomMap:
             self.store.create_bubble(key)
             self._shell_index[key] = set()
 
+    def _ensure_fleet_bubble(self, key: str) -> None:
+        if key not in self._fleet_index:
+            self.store.create_bubble(key)
+            self._fleet_index[key] = set()
+
     def ingest_sats(self, sats: Sequence[TleSat], *, gc_missing: bool = False) -> int:
         """Upsert sat atoms. gc_missing=True removes sats not in catalog (refresh path)."""
         with self._lock:
@@ -91,6 +100,7 @@ class StarlinkAtomMap:
     ) -> int:
         seen: Set[str] = set()
         new_index: Dict[str, Set[str]] = {}
+        new_fleet: Dict[str, Set[str]] = {}
         n = 0
         for sat in sats:
             aid = f"sat:{sat.norad}"
@@ -103,6 +113,7 @@ class StarlinkAtomMap:
             # Preserve T on re-ingest; only refresh metadata + E
             atom.E = sat.name
             prev = dict(atom.metadata.get("v") or {})
+            fleet_name = getattr(sat, "fleet", None) or "starlink"
             atom.metadata["v"] = {
                 **prev,
                 "norad": sat.norad,
@@ -111,7 +122,7 @@ class StarlinkAtomMap:
                 "tle2": sat.line2,
                 "inc": sat.inclination_deg,
                 "shell": sat.shell_key,
-                "fleet": getattr(sat, "fleet", None) or "starlink",
+                "fleet": fleet_name,
                 "country": getattr(sat, "country", None),
                 "kind": "sat",
                 "prop": self.prop_mode,
@@ -121,6 +132,14 @@ class StarlinkAtomMap:
             self._ensure_shell_bubble(sat.shell_key)
             self.store.import_to_bubble(sat.shell_key, aid)
             new_index.setdefault(sat.shell_key, set()).add(aid)
+            fkey = (
+                fleet_name
+                if str(fleet_name).startswith("fleet:")
+                else f"fleet:{fleet_name}"
+            )
+            self._ensure_fleet_bubble(fkey)
+            self.store.import_to_bubble(fkey, aid)
+            new_fleet.setdefault(fkey, set()).add(aid)
             n += 1
 
         gc = 0
@@ -135,6 +154,7 @@ class StarlinkAtomMap:
         self.last_gc_sats = gc
         self._shell_index = new_index
         self._shells = {k: len(v) for k, v in new_index.items()}
+        self._fleet_index = new_fleet
         return n
 
     def ensure_full_grid(self) -> int:
@@ -224,6 +244,8 @@ class StarlinkAtomMap:
     ) -> Dict[Tuple[int, int], int]:
         t0 = time.perf_counter()
         counts: Dict[Tuple[int, int], int] = {}
+        cell_to_sats: Dict[Tuple[int, int], Set[str]] = {}
+        sat_to_cell: Dict[str, Tuple[int, int]] = {}
         errors: List[Tuple[int, str]] = []
         when = when or datetime.now(timezone.utc)
         for sat in sats:
@@ -266,8 +288,13 @@ class StarlinkAtomMap:
                 else:
                     atom.touch(0.3)
             ilat, ilon = latlon_to_bin(lat, lon, self.grid_deg)
-            counts[(ilat, ilon)] = counts.get((ilat, ilon), 0) + 1
+            key = (ilat, ilon)
+            counts[key] = counts.get(key, 0) + 1
+            cell_to_sats.setdefault(key, set()).add(aid)
+            sat_to_cell[aid] = key
         self.density = counts
+        self.cell_to_sats = cell_to_sats
+        self.sat_to_cell = sat_to_cell
         self.last_prop_ms = (time.perf_counter() - t0) * 1000.0
         self.last_error_sats = len(errors)
         self.last_prop_errors = errors
@@ -333,6 +360,13 @@ class StarlinkAtomMap:
                 sats, when=when, minutes=minutes
             )
             hot = self._apply_density_unlocked(counts)
+            if getattr(self, "_reach_session", None) is not None:
+                from engine.reach_studio import rebind_session
+
+                rebind_session(self, bump_version=False)
+            from engine.reach_studio import write_depends_on
+
+            write_depends_on(self)
             self.version += 1
             return {
                 "bins": len(counts),
@@ -343,10 +377,26 @@ class StarlinkAtomMap:
                 "version": self.version,
             }
 
-    def snapshot(self) -> dict:
-        """Atomic immutable-ish view for UI / API (audit #1)."""
+    def snapshot(
+        self,
+        *,
+        reach_only: bool = False,
+        reach_ids: Optional[Set[str]] = None,
+    ) -> dict:
+        """Atomic immutable-ish view for UI / API (audit #1).
+
+        Default (reach_only=False) is the density SoT contract.
+        reach_only filters cells to the session closure — a view, not a rewrite.
+        """
         with self._lock:
             dens = dict(self.density)
+            extra: Dict[str, Any] = {}
+            if reach_only:
+                from engine.reach_studio import filter_density_keys, session_reach
+
+                ids = reach_ids if reach_ids is not None else session_reach(self)
+                dens = filter_density_keys(self, dens, ids)
+                extra["reach_view"] = True
             max_c = max(dens.values()) if dens else 1
             cells_out: List[dict] = []
             for (ilat, ilon), count in dens.items():
@@ -367,7 +417,7 @@ class StarlinkAtomMap:
                         "color": f"rgb({rgb[0]},{rgb[1]},{rgb[2]})",
                     }
                 )
-            return {
+            out = {
                 "version": self.version,
                 "grid_deg": self.grid_deg,
                 "hot_only": self.hot_only,
@@ -381,6 +431,8 @@ class StarlinkAtomMap:
                 "summary": self._summary_unlocked(),
                 "prop_errors_sample": list(self.last_prop_errors[:20]),
             }
+            out.update(extra)
+            return out
 
     def filter_density(
         self,
@@ -449,6 +501,32 @@ class StarlinkAtomMap:
                 ],
             }
 
+    def rebuild_bin_index(self) -> None:
+        """Rebuild cell↔sat index from last lat/lon on sat atoms (no SGP4)."""
+        cell_to_sats: Dict[Tuple[int, int], Set[str]] = {}
+        sat_to_cell: Dict[str, Tuple[int, int]] = {}
+        for atom in self.iter_sats():
+            v = dict(getattr(atom, "metadata", None) or {})
+            meta = dict(v.get("v") or v)
+            if "lat" not in meta or "lon" not in meta:
+                continue
+            try:
+                lat = float(meta["lat"])
+                lon = float(meta["lon"])
+            except (TypeError, ValueError):
+                continue
+            key = latlon_to_bin(lat, lon, self.grid_deg)
+            aid = str(atom.id)
+            cell_to_sats.setdefault(key, set()).add(aid)
+            sat_to_cell[aid] = key
+        self.cell_to_sats = cell_to_sats
+        self.sat_to_cell = sat_to_cell
+        try:
+            from engine.reach_studio import write_depends_on
+        except ImportError:
+            return
+        write_depends_on(self)
+
     def density_cell_consistency(self) -> dict:
         """Faza 0 check: hot-only density keys vs cell atoms in store."""
         with self._lock:
@@ -489,26 +567,36 @@ class StarlinkAtomMap:
             return self._summary_unlocked()
 
     def _summary_unlocked(self) -> dict:
-        sats = list(self.iter_sats())
-        cells = list(self.iter_cells())
-        hot_c = sum(1 for a in cells if a.T >= T_HOT)
-        warm_c = sum(1 for a in cells if T_WARM <= a.T < T_HOT)
-        max_cell = max(cells, key=lambda a: a.T) if cells else None
-        st = self.store.stats() if callable(getattr(self.store, "stats", None)) else {}
-        err_rate = (
-            (self.last_error_sats / len(sats)) if sats else 0.0
-        )
+        n_sats = 0
+        n_cells = 0
+        hot_c = 0
+        warm_c = 0
+        max_cell = None
         fleets: Dict[str, int] = {}
         countries: Dict[str, int] = {}
-        for a in sats:
-            v = dict(a.metadata.get("v") or {})
-            fk = str(v.get("fleet") or "starlink")
-            fleets[fk] = fleets.get(fk, 0) + 1
-            ck = str(v.get("country") or "?").upper()
-            countries[ck] = countries.get(ck, 0) + 1
+        for a in self.store.atoms():
+            kind = getattr(a, "S", None)
+            if kind == S_SAT:
+                n_sats += 1
+                v = dict(a.metadata.get("v") or {})
+                fk = str(v.get("fleet") or "starlink")
+                fleets[fk] = fleets.get(fk, 0) + 1
+                ck = str(v.get("country") or "?").upper()
+                countries[ck] = countries.get(ck, 0) + 1
+            elif kind == S_CELL:
+                n_cells += 1
+                t = float(a.T)
+                if t >= T_HOT:
+                    hot_c += 1
+                elif T_WARM <= t < T_HOT:
+                    warm_c += 1
+                if max_cell is None or t > float(max_cell.T):
+                    max_cell = a
+        st = self.store.stats() if callable(getattr(self.store, "stats", None)) else {}
+        err_rate = (self.last_error_sats / n_sats) if n_sats else 0.0
         return {
-            "sats": len(sats),
-            "cells": len(cells),
+            "sats": n_sats,
+            "cells": n_cells,
             "hot_cells": hot_c,
             "warm_cells": warm_c,
             "hot_only": self.hot_only,

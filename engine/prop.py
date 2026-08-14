@@ -117,6 +117,6 @@ def position_of(
         pos = position_sgp4(sat, base)
         if pos is not None:
             return pos
-        return position_approx(sat, minutes)
+        raise ValueError("sgp4_failed")
     return position_approx(sat, minutes)
 

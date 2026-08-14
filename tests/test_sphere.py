@@ -83,6 +83,23 @@ class TestSphere(unittest.TestCase):
         self.assertEqual(blend["layer"], "blend")
         self.assertIn("exposure", blend["cells"][0])
 
+    def test_radiation_without_weather_is_density_not_fake_score(self):
+        from engine.build import build_map
+        from transform.sphere import export_sphere_data
+
+        _, amap, _, _ = build_map(
+            limit=12,
+            hot_only=True,
+            offline_demo=True,
+            backend="python",
+            cache="out/starlink_tle_cache.txt",
+        )
+        data = export_sphere_data(amap, layer="radiation", assessment=None)
+        self.assertEqual(data["layer"], "density")
+        self.assertFalse(data["solar"]["available"])
+        self.assertIsNone(data["solar"]["base_score"])
+        self.assertNotIn("exposure", data["cells"][0])
+
     def test_api_sphere(self):
         from engine.build import build_map
         from ui.app import StudioState, create_handler

@@ -1,6 +1,6 @@
 """Adapters: snapshots + optional Cynober RPC.
 
-Solar weather lives in ``engine.solar`` (shims under adapters.space_weather).
+Solar weather lives in ``engine.solar``.
 """
 
 from __future__ import annotations

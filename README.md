@@ -13,12 +13,14 @@ CLI default sample **400**. Capacity: `python tests\test_capacity.py`.
 
 | Doc | Content |
 |-----|---------|
+| [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | Instrukcja obsługi (wszystkie funkcje UI + CLI) |
 | [`docs/CLI.md`](docs/CLI.md) | Full CLI subcommands & flags |
 | [`docs/HAZARD_LAYER.md`](docs/HAZARD_LAYER.md) | Solar H0–H8 · multi-fleet H7 · UX |
 | [`docs/STARLINK_ATOMS.md`](docs/STARLINK_ATOMS.md) | Engine contract & layout |
 | [`docs/SLA_50K.md`](docs/SLA_50K.md) | Scale budgets |
 | [`docs/CYNOBER_STUDIO_VERIFIED_PLAN.md`](docs/CYNOBER_STUDIO_VERIFIED_PLAN.md) | Roadmap / status |
-| [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) | **COMPLETE** — project closed for mandatory work |
+| [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) | Status · **COMPLETE** |
+| [`docs/REACH_STUDIO.md`](docs/REACH_STUDIO.md) | Session reach · flags · law (density vs view) |
 
 ## Layout
 
@@ -31,6 +33,7 @@ cynober_studio/
 │   ├── catalogs.py            # H7 Celestrak fleets
 │   ├── solar/                 # H0–H5 weather · hazard · predict · report · geo
 │   ├── export_2d.py · cli.py · live_feeder.py · sla.py
+│   ├── reach_studio.py        # session reach · ghost · impact · live root
 │   └── starlink_atoms.py      # facade
 ├── transform/sphere.py        # 3D quads + radiation layers
 ├── ui/                        # HTTP Studio 2D/3D
@@ -56,6 +59,7 @@ python main.py studio --limit 12000 --open-browser
 :: multi-fleet
 python main.py fleets
 python main.py studio --fleet oneweb --limit 200 --open-browser
+python main.py studio --fleet debris --limit 400 --open-browser
 ```
 
 Top-level help: `python main.py --help` · details: [`docs/CLI.md`](docs/CLI.md).
@@ -113,6 +117,12 @@ python main.py studio --studio-mode 3d --live-feed --interval 30 --open-browser
 | `GET /api/analyze` | density metrics (+ geo) |
 | `GET /api/weather` · `/hazard` · `/predict` · `/report` · `/geo` | solar stack |
 | `GET /api/fleets` · `POST /api/fleet` | multi-fleet |
+| `GET /api/reach` · `POST /api/session` | session reach / scope |
+| `GET /api/ghost` · `POST …/demo` | retained / cold in reach |
+| `POST /api/impact` | cooling impact (simulate default) |
+| `GET /api/resonance` · `POST /api/system_tick` | HRR browse · decisions |
+| `GET/POST /api/attention` | live root · commit vacuum · restore |
+| `GET /api/export` | JSON / MD download |
 | `POST /api/rpc/push` · `pull` | optional Cynober DB |
 
 stdlib only (no Flask). Quality: [`docs/CODE_REVIEW.md`](docs/CODE_REVIEW.md).
@@ -150,10 +160,12 @@ Code: `adapters/cynober_rpc.py`.
 ## Tests
 
 ```bat
-python -m unittest discover -s tests -v
+python run_tests.py
 python tests\test_bench.py
-python tests\test_catalogs.py
+python tests\test_capacity.py
 ```
+
+`run_tests.py` loads `tests/test_*.py` by path so a site-packages `tests` package cannot shadow the suite. Capacity / bench stay optional (scale).
 
 Engine contract:
 

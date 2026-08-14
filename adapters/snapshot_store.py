@@ -347,4 +347,15 @@ def load_snapshot_into_map(
     if amap.version == 0:
         amap.version = 1
     src = str(payload.get("src") or f"snapshot:{payload.get('snapshot_id')}")
+    try:
+        from engine.reach_studio import attach_session, reach_enabled
+
+        if reach_enabled() and tle_sats:
+            attach_session(amap)
+    except Exception as e:
+        import logging
+
+        logging.getLogger("cynober.studio").warning(
+            "snapshot load: session attach skipped: %s", e
+        )
     return store, amap, tle_sats, src

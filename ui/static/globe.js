@@ -185,8 +185,8 @@
     if (info) {
       const labels = {
         density: "density thermal",
-        radiation: "solar radiation intensity (proxy)",
-        blend: "density + radiation blend",
+        radiation: "exposure (2D hazard on globe)",
+        blend: "density + exposure",
       };
       info.textContent = labels[G.layer] || G.layer;
     }
@@ -251,7 +251,7 @@
     }
     // soft ambient tint on earth for radiation layers
     if (G.earth && G.earth.material) {
-      if (layer === "radiation") {
+      if (layer === "radiation" && solar.available !== false) {
         G.earth.material.emissive = new THREE.Color(0x1a0520);
         G.earth.material.color = new THREE.Color(0x0c1028);
       } else if (layer === "blend") {

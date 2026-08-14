@@ -8,15 +8,14 @@ Primary: Celestrak GROUP=… TLE. Optional merge of several fleets.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Tuple
 
-# Public Celestrak endpoints (no auth)
-_CELESTRAK_GROUP = (
-    "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle"
-)
+# Public Celestrak endpoints (no auth).
+_HOST = "https://celestrak.org"
+_CELESTRAK_GROUP = _HOST + "/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle"
+_CELESTRAK_INTDES = _HOST + "/NORAD/elements/gp.php?INTDES={intdes}&FORMAT=tle"
 _CELESTRAK_SUP = (
-    "https://celestrak.org/NORAD/elements/supplemental/sup-gp.php"
-    "?FILE={file}&FORMAT=tle"
+    _HOST + "/NORAD/elements/supplemental/sup-gp.php?FILE={file}&FORMAT=tle"
 )
 
 
@@ -28,15 +27,25 @@ class CatalogSpec:
     label: str
     group: str  # Celestrak GROUP= or supplemental FILE=
     kind: str = "group"  # group | supplemental
+    role: str = "fleet"  # fleet | debris
+    intdes: str = ""  # optional yyyy-nnn launch designator
     note: str = ""
 
     def urls(self) -> Tuple[str, ...]:
+        out: List[str] = []
         if self.kind == "supplemental":
-            return (
-                _CELESTRAK_SUP.format(file=self.group),
-                _CELESTRAK_GROUP.format(group=self.group),
-            )
-        return (_CELESTRAK_GROUP.format(group=self.group),)
+            out.append(_CELESTRAK_SUP.format(file=self.group))
+        if self.intdes:
+            # INTDES first for debris — GROUP=yyyy-nnn 503s while INTDES works
+            out.append(_CELESTRAK_INTDES.format(intdes=self.intdes))
+        out.append(_CELESTRAK_GROUP.format(group=self.group))
+        seen = set()
+        uniq: List[str] = []
+        for u in out:
+            if u not in seen:
+                seen.add(u)
+                uniq.append(u)
+        return tuple(uniq)
 
     def cache_basename(self) -> str:
         return f"tle_{self.id}.txt"
@@ -125,7 +134,56 @@ FLEET_CATALOG: Tuple[CatalogSpec, ...] = (
     ),
 )
 
-_BY_ID: Dict[str, CatalogSpec] = {c.id: c for c in FLEET_CATALOG}
+# Public Celestrak event-cloud debris (no Space-Track; not SSA).
+DEBRIS_CATALOG: Tuple[CatalogSpec, ...] = (
+    CatalogSpec(
+        "fy1c-debris",
+        "Fengyun-1C debris",
+        "1999-025",
+        role="debris",
+        intdes="1999-025",
+        note="2007 Chinese ASAT cloud",
+    ),
+    CatalogSpec(
+        "cosmos-2251-debris",
+        "Cosmos 2251 debris",
+        "cosmos-2251-debris",
+        role="debris",
+        intdes="1993-036",
+        note="2009 collision cloud (Cosmos 2251)",
+    ),
+    CatalogSpec(
+        "iridium-33-debris",
+        "Iridium 33 debris",
+        "iridium-33-debris",
+        role="debris",
+        intdes="1997-051",
+        note="2009 collision cloud (Iridium 33)",
+    ),
+    CatalogSpec(
+        "microsat-r-debris",
+        "Microsat-R debris",
+        "2019-006",
+        role="debris",
+        intdes="2019-006",
+        note="2019 Indian ASAT cloud",
+    ),
+    CatalogSpec(
+        "cosmos-1408-debris",
+        "Cosmos 1408 debris",
+        "cosmos-1408-debris",
+        role="debris",
+        intdes="1982-092",
+        note="2021 Russian ASAT cloud",
+    ),
+)
+
+DEBRIS_ALIASES = frozenset(
+    {"debris", "space-debris", "space_debris", "orbital-debris", "junk"}
+)
+
+_ALL_CATALOGS: Tuple[CatalogSpec, ...] = FLEET_CATALOG + DEBRIS_CATALOG
+_BY_ID: Dict[str, CatalogSpec] = {c.id: c for c in _ALL_CATALOGS}
 
 
 def list_fleets() -> List[dict]:
@@ -135,15 +193,22 @@ def list_fleets() -> List[dict]:
             "label": c.label,
             "group": c.group,
             "kind": c.kind,
+            "role": c.role,
             "note": c.note,
             "urls": list(c.urls()),
         }
-        for c in FLEET_CATALOG
+        for c in _ALL_CATALOGS
     ]
+
+
+def debris_catalog_ids() -> List[str]:
+    return [c.id for c in DEBRIS_CATALOG]
 
 
 def get_fleet(fleet_id: str) -> CatalogSpec:
     key = (fleet_id or "starlink").strip().lower()
+    if key in DEBRIS_ALIASES:
+        return DEBRIS_CATALOG[0]
     if key in _BY_ID:
         return _BY_ID[key]
     # allow raw celestrak group names
@@ -170,12 +235,15 @@ def curated_fleet_ids(*, include_active: bool = False) -> List[str]:
 def parse_fleet_list(value: Optional[str]) -> List[str]:
     """
     'starlink' | 'starlink,oneweb' | 'starlink+oneweb' → list of ids.
-    'all' / '*' → all curated fleets except 'active' (use 'all+active' for that).
-    Empty → ['starlink'].
+    'all' / '*' → all curated fleets except 'active' and debris.
+    'debris' → public Celestrak event clouds (FY-1C, Iridium 33, Cosmos 2251,
+    Microsat-R, Cosmos 1408). Empty → ['starlink'].
     """
     if not value or not str(value).strip():
         return ["starlink"]
     raw = str(value).replace("+", ",").replace(";", ",").strip().lower()
+    if raw in DEBRIS_ALIASES:
+        return debris_catalog_ids()
     if raw in ("all", "*", "all-curated", "all_curated"):
         return curated_fleet_ids(include_active=False)
     if raw in ("all+active", "all_active", "all,active"):
@@ -186,6 +254,8 @@ def parse_fleet_list(value: Optional[str]) -> List[str]:
     for p in parts:
         if p in ("all", "*"):
             expanded.extend(curated_fleet_ids(include_active=False))
+        elif p in DEBRIS_ALIASES:
+            expanded.extend(debris_catalog_ids())
         else:
             expanded.append(p)
     # dedupe preserve order
@@ -201,10 +271,3 @@ def parse_fleet_list(value: Optional[str]) -> List[str]:
 def default_cache_path(fleet_id: str, root: str = "out") -> str:
     spec = get_fleet(fleet_id)
     return f"{root.rstrip('/')}/{spec.cache_basename()}"
-
-
-def fleet_label(fleet_ids: Sequence[str]) -> str:
-    ids = list(fleet_ids) or ["starlink"]
-    if len(ids) == 1:
-        return get_fleet(ids[0]).label
-    return "+".join(get_fleet(i).label for i in ids)

@@ -40,6 +40,11 @@ FLEET_COUNTRY = {
     "stations": "ISS",
     "visual": "INT",
     "active": "INT",
+    "fy1c-debris": "CN",
+    "cosmos-2251-debris": "RU",
+    "iridium-33-debris": "US",
+    "microsat-r-debris": "IN",
+    "cosmos-1408-debris": "RU",
 }
 
 
@@ -198,14 +203,6 @@ class SatcatIndex:
         self.cache_path.write_text(
             json.dumps(payload, ensure_ascii=False), encoding="utf-8"
         )
-
-    def country_for(self, norad: int, *, fleet: str = "") -> Optional[str]:
-        c = self._map.get(int(norad))
-        if c:
-            return c
-        if fleet:
-            return FLEET_COUNTRY.get(fleet.lower())
-        return None
 
     def annotate_sats(self, sats: Sequence[Any]) -> Tuple[int, int]:
         """

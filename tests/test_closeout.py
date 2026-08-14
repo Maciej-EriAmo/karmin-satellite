@@ -20,6 +20,7 @@ class TestFleetAllAlias(unittest.TestCase):
         self.assertIn("starlink", ids)
         self.assertIn("oneweb", ids)
         self.assertNotIn("active", ids)
+        self.assertNotIn("fy1c-debris", ids)
         self.assertEqual(ids, curated_fleet_ids(include_active=False))
         self.assertIn("active", parse_fleet_list("all+active"))
 
@@ -67,6 +68,34 @@ class TestSatcatCountry(unittest.TestCase):
         self.assertTrue(all((s.country or "").upper() == "US" for s in use))
         self.assertIn("country=US", src)
         self.assertIn("US", amap.summary().get("countries") or {})
+
+    def test_reload_tle_keeps_country_filter(self):
+        from engine.build import build_map
+        from ui.app import StudioState
+
+        _, amap, use, src = build_map(
+            limit=20,
+            offline_demo=True,
+            fleet="starlink",
+            country="US",
+            hot_only=True,
+            backend="python",
+        )
+        state = StudioState(
+            amap=amap,
+            catalog=list(use),
+            src=src,
+            using=len(use),
+            limit=20,
+            offline_demo=True,
+            fleet="starlink",
+            country="US",
+        )
+        info = state.refresh_catalog(reload_tle=True)
+        self.assertGreater(state.using, 0)
+        self.assertTrue(all((s.country or "").upper() == "US" for s in state.catalog))
+        self.assertIn("country=US", state.src)
+        self.assertIn("using", info)
 
 
 class TestTimelineAnalytics(unittest.TestCase):

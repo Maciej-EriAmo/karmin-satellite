@@ -76,6 +76,17 @@ class TestEnginePhase01(unittest.TestCase):
         # shells rebuilt
         self.assertEqual(sum(amap._shells.values()), 10)
 
+    def test_sgp4_failure_is_error_not_silent_approx(self):
+        from engine.prop import position_of
+        from engine.tle import build_demo_catalog
+
+        sat = build_demo_catalog(1)[0]
+        sat.line1 = "1 00000U junk"
+        sat.line2 = "2 00000 junk"
+        sat._satrec = None
+        with self.assertRaises(Exception):
+            position_of(sat, mode="sgp4")
+
     def test_reingest_preserves_shell_counts(self):
         _, amap, use, _ = self._map(12)
         s1 = dict(amap._shells)

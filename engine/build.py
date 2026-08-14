@@ -114,6 +114,11 @@ def build_map(
     if not hot_only:
         amap.ensure_full_grid()
     amap.refresh(use, minutes=minutes)
+    from engine.reach_studio import attach_session, reach_enabled
+
+    if reach_enabled():
+        # Catalog is already sliced (limit / fleet / country). Bind all loaded.
+        attach_session(amap)
     return store, amap, use, src_s
 
 

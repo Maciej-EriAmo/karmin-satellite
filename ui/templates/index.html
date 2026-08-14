@@ -10,7 +10,7 @@
   <header>
     <div>
       <h1><span>Cynober</span> Studio</h1>
-      <div class="sub">thermal atoms · public fleets · density 2D / 3D · research workbench</div>
+      <div class="sub">thermal atoms · live root · T×reach · 50k SLA</div>
     </div>
     <div class="header-badges">
       <span class="badge" id="badge-status">boot</span>
@@ -18,6 +18,7 @@
       <span class="badge" id="badge-mode">2d</span>
       <span class="badge" id="badge-weather" title="Public NOAA SWPC solar indices (research proxy)">solar —</span>
       <span class="badge" id="badge-hazard" title="Group solar hazard proxy">hazard —</span>
+      <span class="badge" id="badge-reach" title="Session reach view">reach off</span>
     </div>
   </header>
 
@@ -33,6 +34,7 @@
         <button type="button" id="btn-layer-density" class="primary" title="Satellite density">Density</button>
         <button type="button" id="btn-layer-hazard" title="Solar exposure proxy">Hazard</button>
         <button type="button" id="btn-layer-blend" title="Density + hazard blend">Blend</button>
+        <button type="button" id="btn-layer-ghost" title="Retained TOMB / cold in session reach">Ghost</button>
       </div>
       <div class="sub" id="layer-info">density · solar overlay off</div>
       <div class="sub" id="map-px-info" title="H8 adaptive cell size">cell px —</div>
@@ -40,8 +42,8 @@
       <h2 style="margin-top:1rem">3D layer</h2>
       <div class="btns" id="globe-layer-btns">
         <button type="button" id="btn-globe-density" class="primary" title="Density thermal on globe">Density</button>
-        <button type="button" id="btn-globe-radiation" title="H6 solar radiation intensity (proxy)">Radiation</button>
-        <button type="button" id="btn-globe-blend" title="Density + radiation blend">Blend</button>
+        <button type="button" id="btn-globe-radiation" title="Same 2D hazard overlay on the globe (solar score × density). Not physical dose.">Exposure</button>
+        <button type="button" id="btn-globe-blend" title="Density + exposure blend">Blend</button>
       </div>
       <div class="sub" id="globe-layer-info">density thermal</div>
 
@@ -67,17 +69,41 @@
       </select>
       <fieldset style="margin-top:.65rem">
         <legend>Load limit · <span id="load-limit-val">400</span></legend>
-        <input type="range" id="load-limit" min="40" max="5000" step="40" value="400"/>
-        <div class="sub" style="margin-top:.25rem">40 … 5000 · or full catalog below</div>
+        <div class="btns limit-presets" id="limit-presets">
+          <button type="button" data-limit="400">400</button>
+          <button type="button" data-limit="2000">2k</button>
+          <button type="button" data-limit="10000">10k</button>
+          <button type="button" data-limit="50000" title="SLA usable budget">50k</button>
+        </div>
+        <input type="range" id="load-limit" min="40" max="50000" step="40" value="400"/>
+        <input type="number" id="load-limit-num" class="ctl-num" min="40" max="50000" step="40" value="400"/>
+        <div class="sub" style="margin-top:.25rem">40 … 50 000 (SLA usable) · or full catalog</div>
         <label class="row" style="margin-top:.35rem">
-          <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling)
+          <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling 100k)
         </label>
       </fieldset>
       <div class="btns" style="margin-top:.5rem">
         <button class="primary" id="btn-load-sats" type="button" title="Download / rebuild map from selected catalog and limit">Load satellites</button>
+        <button id="btn-load-debris" type="button" title="Public Celestrak debris clouds (FY-1C, Iridium 33, Cosmos 2251, Microsat-R, Cosmos 1408). Not Space-Track, not SSA.">Load debris</button>
         <button id="btn-fleet-apply" type="button" title="Same as Load satellites">Reload</button>
       </div>
       <div class="sub" id="fleet-info">fleet — · limit —</div>
+      <div class="sub" id="debris-info">debris = 5 public event clouds · Celestrak GP · research only</div>
+
+      <h2 style="margin-top:1.2rem">Reach / Ghost</h2>
+      <p class="sub" style="margin:0 0 .4rem">Session root + retained TOMB — law: T says when, reach says whether</p>
+      <label class="row">
+        <input type="checkbox" id="reach-toggle"/> Reach view
+      </label>
+      <label class="row">
+        <input type="checkbox" id="ghost-under" checked/> Ghost under density
+      </label>
+      <div class="stat"><span>Reach</span><b id="stat-reach">off</b></div>
+      <div class="stat"><span>Ghost</span><b id="stat-ghost">—</b></div>
+      <div class="sub" id="reach-info">off · full density (SoT)</div>
+      <div class="btns">
+        <button type="button" id="btn-ghost-demo" title="Artificially cool a few sats in reach so the ghost layer has something to show">Demo: cool in reach</button>
+      </div>
 
       <h2 style="margin-top:1.2rem">Filter (S4b)</h2>
       <fieldset>
@@ -93,10 +119,16 @@
       <div class="sub" id="filter-info">all · min≥1</div>
       <div class="btns">
         <button class="primary" id="btn-refresh" type="button">Refresh</button>
+        <button id="btn-impact" type="button" title="Simulate cooling the selected shell">Impact</button>
         <button id="btn-reset" type="button">Reset filter</button>
-        <button id="btn-snapshot" type="button">Save</button>
-        <button id="btn-rpc-push" type="button" title="Push current map snapshot to Cynober DB">Push DB</button>
+        <button id="btn-snapshot" type="button" title="Save snapshot on disk (out/snapshots)">Save server</button>
+        <button id="btn-export-json" type="button" title="Download current view as JSON file">JSON file</button>
+        <button id="btn-export-md" type="button" title="Download reach/ghost/density report as Markdown">MD file</button>
+        <button id="btn-rpc-push" type="button" hidden title="Optional Cynober DB — hidden unless the client is installed">Push DB</button>
       </div>
+      <label class="row">
+        <input type="checkbox" id="export-sats"/> Include TLE in JSON file
+      </label>
       <div class="sub" id="snap-info"></div>
       <div class="error" id="err"></div>
 
@@ -160,6 +192,41 @@
 
     <section class="panel panel-viz" id="panel-heatmap">
       <h2>Map (2D) · <span id="map2d-title" class="sub">density</span></h2>
+      <div class="wow-bar" id="wow-bar">
+        <button type="button" id="btn-live-wow" class="wow-toggle" title="Session is the only GC root — out of reach + cold = vacuum">Live root</button>
+        <button type="button" id="btn-commit-wow" class="wow-toggle" title="Cool outside session and tick — they vanish for real">Commit</button>
+        <button type="button" id="btn-restore-wow" title="Put catalog root back and re-ingest TLE">Restore</button>
+        <button type="button" id="btn-reach-wow" class="wow-toggle" title="Filter = session root, not a cropped PNG">Reach view</button>
+        <button type="button" id="btn-impact-wow" class="wow-toggle" title="What if this shell goes cold — simulate, density stays">Impact</button>
+        <button type="button" id="btn-tick-wow" class="wow-toggle" title="One Store.tick() + fleet status log. cool_hint is not applied. Not a control plane.">Fleet log</button>
+        <input type="search" id="resonance-q" class="wow-search" placeholder="Search · name or shell:53" title="Exact name / shell / fleet. HRR only when it actually hits."/>
+        <div class="wow-metric">live <b id="wow-live">catalog root</b></div>
+        <div class="wow-metric">reach <b id="wow-reach">off</b></div>
+        <div class="wow-metric">ghost <b id="wow-ghost">—</b></div>
+        <div class="wow-metric">impact <b id="wow-impact">—</b></div>
+        <div class="wow-metric">tick <b id="wow-tick">—</b></div>
+        <div class="wow-metric">density SoT <b id="wow-sot">—</b></div>
+        <div class="wow-actions">
+          <button type="button" id="btn-export-json-wow" title="Download JSON">JSON</button>
+          <button type="button" id="btn-export-md-wow" title="Download Markdown">MD</button>
+        </div>
+      </div>
+      <div class="impact-panel live-panel" id="live-panel" hidden>
+        <div class="impact-kicker">live root · T says when · reach says whether</div>
+        <div class="impact-line" id="live-line">session-only GC off · catalog protects</div>
+        <pre class="impact-log" id="live-log">out of session + cold → vacuum
+in session + cold → ghost (retained)
+depends_on lives on the cell atom — Impact reads the graph</pre>
+      </div>
+      <div class="impact-panel" id="impact-panel" hidden>
+        <div class="impact-kicker">if this scope goes cold · simulate</div>
+        <div class="impact-line" id="impact-line">pick a shell, then Impact</div>
+        <pre class="impact-log" id="impact-log"></pre>
+      </div>
+      <div class="impact-panel decisions-panel" id="decisions-panel" hidden>
+        <div class="impact-kicker">fleet log · last 10 · advisory</div>
+        <pre class="impact-log" id="decisions-log">fleet log → one settle + status</pre>
+      </div>
       <div class="viz-wrap viz-map" id="map-wrap">
         <canvas id="heatmap" width="960" height="480"></canvas>
         <div class="edge-aura" id="map-aura" aria-hidden="true"></div>
@@ -168,6 +235,9 @@
       <div class="legend-row" id="map-legend">
         <span class="leg-swatch dens"></span><span class="sub">density</span>
         <span class="leg-swatch haz"></span><span class="sub">solar exposure (proxy)</span>
+        <span class="leg-swatch ghost"></span><span class="sub">ghost · retained / cold</span>
+        <span class="leg-swatch impact"></span><span class="sub">impact · emptied / hit (5s)</span>
+        <span class="leg-swatch reso"></span><span class="sub">resonance highlight</span>
         <span class="leg-swatch aura"></span><span class="sub">edge aura ∝ solar stress</span>
       </div>
       <p class="sub" style="margin:.75rem 0 0">
@@ -183,12 +253,12 @@
       </div>
       <div class="legend-row" id="globe-legend" style="margin-top:.5rem">
         <span class="leg-swatch dens"></span><span class="sub">density</span>
-        <span class="leg-swatch haz"></span><span class="sub">radiation intensity (proxy)</span>
+        <span class="leg-swatch haz"></span><span class="sub">exposure (same as 2D hazard)</span>
         <span class="leg-swatch aura"></span><span class="sub">edge aura ∝ solar stress</span>
       </div>
       <p class="sub" style="margin:.75rem 0 0">
-        Drag to rotate · scroll zoom · larger viewport · layers Density / Radiation / Blend ·
-        edge aura on frame border.
+        Drag to rotate · scroll zoom · layers Density / Exposure / Blend
+        (exposure = hazard overlay, not physical radiation).
       </p>
     </section>
   </main>

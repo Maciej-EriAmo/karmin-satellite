@@ -807,17 +807,19 @@ def cmd_run(argv: Sequence[str], *, studio: bool = False) -> int:
         isolated = not args.lua_shared
         print(f"--- lua :tool {tool}  isolate={isolated} ---")
         try:
-            print(
-                run_lua_tool_name(
-                    store,
-                    tool,
-                    amap=amap,
-                    isolated=isolated,
-                    copy_sats=args.lua_copy_sats,
-                )
+            lua_out = run_lua_tool_name(
+                store,
+                tool,
+                amap=amap,
+                isolated=isolated,
+                copy_sats=args.lua_copy_sats,
             )
+            print(lua_out)
         except Exception as e:
             print(f"Lua tool error: {e}", file=sys.stderr)
+            return 1
+        if lua_out.startswith("(brak") or lua_out.startswith("(Lua bridge"):
+            print("Lua tool unavailable — not a successful run.", file=sys.stderr)
             return 1
         cat_after = store.stats() if callable(getattr(store, "stats", None)) else {}
         print(

@@ -37,8 +37,10 @@ Show that **one atom substrate** can multi-task a real-scale public workload wit
 | Solar | `engine/solar/*` — research proxies (not atoms) |
 | Studio UI | 2D canvas + 3D globe + filters + fleet picker |
 | Persistence | local JSON snapshots (`out/snapshots/`, optional `solar` meta) |
+| Reach (W1) | `session:{id}` root + `/api/reach` — view, not density SoT |
 
-**Law (kernel):** temperature says *when*; reachability says *whether*.
+**Law (kernel):** temperature says *when*; reachability says *whether*.  
+**Reach Studio:** [`REACH_STUDIO.md`](REACH_STUDIO.md) · flags `CYNOBER_REACH` / `CYNOBER_REACH_MODE`.
 
 This is **not** an ops SSA product. It is a **substrate + research workbench** for public constellation data.
 
@@ -109,7 +111,15 @@ Sat metadata `v`: `norad`, `name`, `tle*`, `inc`, `shell`, **`fleet`**, lat/lon/
 
 | Endpoint | Role |
 |----------|------|
-| `GET /api/data` | snapshot density + `fleet` + feeder |
+| `GET /api/data` | snapshot density + `fleet` + feeder · `?reach=1` = session view |
+| `GET /api/reach` | session reach counts (no sat dump) |
+| `POST /api/session` | rebuild session bubble bindings |
+| `GET /api/ghost` · `POST /api/ghost/demo` | W2 retained layer |
+| `GET /api/export` | download JSON/MD file |
+| `POST /api/impact` | W3 cooling impact (simulate default; `source: graph`) |
+| `GET /api/resonance` | W4 HRR / lexical highlight |
+| `POST /api/system_tick` · `GET /api/decisions` | W5 fleet decision log |
+| `GET/POST /api/attention` | live root · commit vacuum · restore catalog |
 | `GET /api/sphere?layer=` | 3D quads · `density` \| `radiation` \| `blend` |
 | `GET /api/filter` | shell / min_count |
 | `POST /api/refresh` | re-propagate · optional reload_tle |
@@ -136,6 +146,13 @@ stdlib `http.server` only (no Flask). See [README.md](../README.md).
 | Horizons | 1h/6h/24h panel (H3) |
 | Alt / sunlit | H5 panel |
 | Fleet picker | H7 Load fleet rebuilds map |
+| Reach view | Session root · filters POST `/api/session` · `?reach=1` |
+| Ghost | Retained/cold under density · layer + **Show ghosts** |
+| Export | Download JSON / MD (`GET /api/export`) · limit presets to **50k** |
+| Impact | Simulate cooling a shell → emptied cells + 5s highlight |
+| Resonance | Search bar on map · cyan pulse |
+| Decisions | System tick · last 10 actions |
+| Live root | Session-only GC · Commit vacuums · cell `depends_on` |
 | Library | Snapshot list / load / save (solar meta on save) |
 
 ---
@@ -143,7 +160,7 @@ stdlib `http.server` only (no Flask). See [README.md](../README.md).
 ## Tests
 
 ```powershell
-python -m unittest discover -s tests -v
+python run_tests.py
 python tests\test_catalogs.py
 python tests\test_space_weather.py
 python tests\test_sphere.py

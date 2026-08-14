@@ -138,6 +138,11 @@ def amap_density_analytics(amap: Any) -> dict:
     counts = sorted(int(c) for _, c in dens)
     total = sum(counts)
     max_c = counts[-1] if counts else 0
+    hotspot = None
+    for (ilat, ilon), c in dens:
+        if int(c) == max_c:
+            hotspot = {"ilat": ilat, "ilon": ilon, "count": int(c)}
+            break
 
     def _pct(p: float) -> int:
         if not counts:
@@ -154,10 +159,12 @@ def amap_density_analytics(amap: Any) -> dict:
         "cells": len(counts),
         "sum_count": total,
         "max_count": max_c,
+        "hotspot": hotspot,
         "p50": _pct(50),
         "p90": _pct(90),
         "top_cells": top,
         "shells": summ.get("shells") or {},
         "fleets": summ.get("fleets") or {},
+        "countries": summ.get("countries") or {},
         "version": summ.get("version"),
     }

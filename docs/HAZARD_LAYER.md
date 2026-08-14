@@ -25,7 +25,7 @@ transform/sphere.py  # H6 3D layers density|radiation|blend
 ui/static/heatmap.js · globe.js · studio.css   # H8 adaptive px + edge aura
 ```
 
-Compatibility shims: `adapters/space_weather.py`, `engine/hazard.py`, `engine/predict.py` → re-export `engine.solar`.
+Canon is `engine.solar` (no compatibility shims).
 
 ## Shipped matrix
 

@@ -226,6 +226,9 @@ class CynoberRpcBridge:
                 # try select anyway
                 pass
         row = self.client.query_line(f'WYBIERZ ŚWIAT "{w}"')
+        st = str((row or {}).get("status") or "").lower()
+        if st and st not in ("ok", "none"):
+            raise CynoberRpcError(f'WYBIERZ ŚWIAT "{w}" failed: {row}')
         self.world = world
         self._world_selected = True
         return row
@@ -239,7 +242,7 @@ class CynoberRpcBridge:
         except Exception:
             info = {}
         return {
-            "status": row.get("status") or "ok",
+            "status": row.get("status") or "unknown",
             "health": row,
             "session": info,
             "world": self.world,
