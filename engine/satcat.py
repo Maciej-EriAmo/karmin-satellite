@@ -49,7 +49,13 @@ FLEET_COUNTRY = {
 
 
 def _default_cache_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "out" / "satcat_cache.json"
+    try:
+        from engine.user_paths import cache_file, relocate_legacy
+
+        relocate_legacy()
+        return cache_file("satcat_cache.json")
+    except Exception:
+        return Path(__file__).resolve().parents[1] / "out" / "satcat_cache.json"
 
 
 def _http_get(url: str, *, timeout: float = 60.0) -> str:

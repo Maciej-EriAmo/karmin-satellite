@@ -43,8 +43,14 @@ def _utc_now_iso() -> str:
 
 
 def _default_cache_path() -> Path:
-    root = Path(__file__).resolve().parents[1]
-    return root / "out" / "space_weather_cache.json"
+    try:
+        from engine.user_paths import cache_file, relocate_legacy
+
+        relocate_legacy()
+        return cache_file("space_weather_cache.json")
+    except Exception:
+        root = Path(__file__).resolve().parents[1]
+        return root / "out" / "space_weather_cache.json"
 
 
 def flare_class_from_flux(flux_w_m2: float) -> Tuple[str, float]:

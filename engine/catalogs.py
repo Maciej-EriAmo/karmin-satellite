@@ -268,6 +268,15 @@ def parse_fleet_list(value: Optional[str]) -> List[str]:
     return out or ["starlink"]
 
 
-def default_cache_path(fleet_id: str, root: str = "out") -> str:
+def default_cache_path(fleet_id: str, root: str = "") -> str:
     spec = get_fleet(fleet_id)
-    return f"{root.rstrip('/')}/{spec.cache_basename()}"
+    name = spec.cache_basename()
+    if root:
+        return f"{root.rstrip('/')}/{name}"
+    try:
+        from engine.user_paths import cache_file, relocate_legacy
+
+        relocate_legacy()
+        return str(cache_file(name))
+    except Exception:
+        return f"out/{name}"
