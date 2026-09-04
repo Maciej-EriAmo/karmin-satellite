@@ -542,7 +542,6 @@ button.primary {
 
 .an-top b { color: var(--warm); font-variant-numeric: tabular-nums; }
 
-/* Heatmap: width 100% of panel; buffer = grid × cellPx (scales on resize). */
 .delta-hazard {
   margin-top: 0.45rem;
   padding: 0.35rem 0.5rem;
@@ -569,6 +568,7 @@ button.primary {
   margin: 0;
 }
 
+/* Heatmap: width 100% of panel; buffer = grid × cellPx (scales on resize). */
 #heatmap {
   display: block;
   width: 100%;

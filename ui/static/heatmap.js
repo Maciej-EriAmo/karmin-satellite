@@ -13,7 +13,7 @@
     hazard: null,
     nlat: 36,
     nlon: 72,
-    nSats: 0, // for H8 adaptive pixels
+    nSats: 0,
     cellPx: 8,
     fleet: "starlink",
     country: "",
@@ -78,10 +78,7 @@
   /** Finest cell size (CSS px) when the panel is narrow or the grid is dense. */
   const CELL_PX_MIN = 0.5;
 
-  /**
-   * H8: cell size always tracks panel width so the sat view scales on resize.
-   * cellPx = availW / nlon (floor CELL_PX_MIN). Full cell rects, not fixed dots.
-   */
+  /** Cell size tracks panel width: max(CELL_PX_MIN, availW / nlon). */
   function adaptiveCellPx({ nlon, availW }) {
     const cols = Math.max(1, Number(nlon) || 72);
     return Math.max(CELL_PX_MIN, (Number(availW) || 960) / cols);
@@ -234,7 +231,68 @@
     return Math.max(0, Math.min(100, baseScore * weight));
   }
 
+  function applyDeltaChrome() {
+    setText("layer-info", "DELTA · only changes · green↑ red↓ · vanished ≈ density loss");
+    if (state.delta) {
+      const d = state.delta;
+      setText(
+        "map2d-title",
+        `delta · +${d.appeared || 0} / −${d.vanished || 0} · ΔΣ ${d.delta_sum_count ?? "—"}`
+      );
+    } else {
+      setText("map2d-title", "delta · waiting for A→B…");
+    }
+  }
+
+  function paintDeltaOrPlaceholder() {
+    if (state.delta) drawDeltaMap(state.delta);
+    else paintDeltaPlaceholder();
+  }
+
+  function paintDeltaPlaceholder(message) {
+    const canvas = $("heatmap");
+    if (!canvas) return;
+    const nlat = state.nlat || 36;
+    const nlon = state.nlon || 72;
+    const wrap = $("map-wrap");
+    const availW = Math.max(
+      320,
+      (wrap && wrap.clientWidth) || canvas.parentElement?.clientWidth || 960
+    );
+    const cellPx = adaptiveCellPx({ nlon, availW });
+    state.cellPx = cellPx;
+    const cssW = Math.max(1, nlon * cellPx);
+    const cssH = Math.max(1, nlat * cellPx);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = "100%";
+    canvas.style.maxWidth = "100%";
+    canvas.style.height = "auto";
+    canvas.style.aspectRatio = `${nlon} / ${nlat}`;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssH * dpr));
+    canvas.style.imageRendering = "auto";
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#08060a";
+    ctx.fillRect(0, 0, cssW, cssH);
+    ctx.fillStyle = "#9a8a92";
+    ctx.font = "14px Segoe UI, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(
+      message || "Delta · save ≥2 snapshots or Arm baseline + Live Δ",
+      cssW / 2,
+      cssH / 2
+    );
+    setText("map2d-title", "delta · waiting for A→B…");
+    setText("map-px-info", "delta · no compare yet · research · not SSA");
+  }
+
   function redrawMap() {
+    if (state.deltaMode) {
+      paintDeltaOrPlaceholder();
+      return;
+    }
     const density = state.view || [];
     const nlat = state.nlat || 36;
     const nlon = state.nlon || 72;
@@ -242,6 +300,10 @@
   }
 
   function setLayer(layer) {
+    if (state.deltaMode) {
+      applyDeltaChrome();
+      return;
+    }
     state.layer = layer;
     ["density", "hazard", "blend", "ghost"].forEach((L) => {
       const btn = $(`btn-layer-${L}`);
@@ -481,13 +543,16 @@
     state.nlat = nlat;
     state.nlon = nlon;
     state.view = density;
-    // stats first so adaptiveCellPx sees nSats
     updateStats(data.summary, data);
     if (data.using != null && !state.nSats) {
       state.nSats = Number(data.using) || 0;
     }
-    drawMap(density, nlat, nlon, state.layer || "density");
     analyzeDensity(density);
+    if (state.deltaMode) {
+      paintDeltaOrPlaceholder();
+      return;
+    }
+    drawMap(density, nlat, nlon, state.layer || "density");
   }
 
   async function fetchJSON(url, opts) {
@@ -1248,12 +1313,17 @@
 
   function enterDeltaMode() {
     state.deltaMode = true;
-    setText("layer-info", "DELTA · only changes · green↑ red↓ · vanished ≈ density loss");
-    if (state.delta) drawDeltaMap(state.delta);
-    else {
-      compareNewestTimeline().catch(() =>
-        setText("timeline-info", "Save ≥2 snapshots or Arm baseline + Live Δ")
-      );
+    applyDeltaChrome();
+    const timelineBlock = $("side-timeline-delta");
+    if (timelineBlock) timelineBlock.open = true;
+    if (state.delta) {
+      drawDeltaMap(state.delta);
+    } else {
+      paintDeltaPlaceholder();
+      compareNewestTimeline().catch(() => {
+        setText("timeline-info", "Save ≥2 snapshots or Arm baseline + Live Δ");
+        paintDeltaPlaceholder();
+      });
     }
     loadDeltaLog().catch(() => {});
     if (state.deltaPoll) clearInterval(state.deltaPoll);
@@ -1305,9 +1375,7 @@
     state.nlat = nlat;
     state.nlon = nlon;
     state.view = dens;
-    // H8: group/shell filter → fewer sats → larger pixels
     state.nSats = Number(d.count_sats) || dens.reduce((s, x) => s + (x.count || 0), 0);
-    drawMap(dens, nlat, nlon, state.layer || "density");
     setText("stat-cells", d.count_cells);
     setText("stat-sats", d.count_sats);
     setText("stat-version", d.version);
@@ -1316,6 +1384,11 @@
       `${d.shell} · min≥${d.min_count} · cells ${d.count_cells} · cell ~${Number(state.cellPx || 0).toFixed(1)}px`
     );
     analyzeDensity(dens);
+    if (state.deltaMode) {
+      paintDeltaOrPlaceholder();
+      return;
+    }
+    drawMap(dens, nlat, nlon, state.layer || "density");
   }
 
   async function refreshMap() {
@@ -1864,7 +1937,7 @@
         const w = (wrap && wrap.clientWidth) || 0;
         if (w && Math.abs(w - _lastFitW) < 1) return;
         _lastFitW = w;
-        if (state.deltaMode && state.delta) drawDeltaMap(state.delta);
+        if (state.deltaMode) paintDeltaOrPlaceholder();
         else if (state.view) redrawMap();
       }, 80);
     };
