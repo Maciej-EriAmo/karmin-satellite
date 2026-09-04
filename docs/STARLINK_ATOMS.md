@@ -75,12 +75,13 @@ pip install -r requirements.txt
 python main.py --offline-demo --limit 40 --hot-only --no-heatmap
 
 # Studio UI (preferred subcommand)
-python main.py studio --offline-demo --limit 40 --open-browser
-python main.py studio --limit 12000 --open-browser
+python main.py studio
+python main.py studio --limit 12000
+python main.py studio --offline-demo --limit 40
 
 # Fleet switch (H7)
 python main.py fleets
-python main.py studio --fleet oneweb --limit 200 --open-browser
+python main.py studio --fleet oneweb --limit 200
 
 # Solar / geo
 python main.py weather --offline

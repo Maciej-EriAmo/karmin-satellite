@@ -35,7 +35,7 @@ Research workbench for public satellite density + solar context on a thermal-ato
 ## How to run
 
 ```bat
-python main.py studio --offline-demo --limit 40 --open-browser
+python main.py studio
 python main.py fleets
 python main.py timeline
 python main.py --fleet starlink --country US --limit 200

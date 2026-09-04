@@ -55,17 +55,18 @@ karmin-satellite/
 cd /d C:\Users\drwis\karmin-satellite
 python -m pip install -r requirements.txt
 
-:: offline smoke
+:: Studio UI (normal — Celestrak / cache, opens browser)
+python main.py studio
+python main.py studio --limit 12000
+python main.py studio --fleet oneweb --limit 200
+python main.py studio --fleet debris --limit 400
+
+:: offline smoke only (synthetic TLE, no network)
+python main.py studio --offline-demo --limit 40
 python main.py --offline-demo --limit 40 --hot-only --no-heatmap
 
-:: Studio UI (subcommand preferred)
-python main.py studio --offline-demo --limit 40 --open-browser
-python main.py studio --limit 12000 --open-browser
-
-:: multi-fleet
+:: multi-fleet list
 python main.py fleets
-python main.py studio --fleet oneweb --limit 200 --open-browser
-python main.py studio --fleet debris --limit 400 --open-browser
 ```
 
 Top-level help: `python main.py --help` · details: [`docs/CLI.md`](docs/CLI.md).
@@ -91,9 +92,10 @@ python main.py --fleet starlink,oneweb --limit 40 --offline-demo --no-heatmap
 ## Studio UI
 
 ```bat
-python main.py studio --offline-demo --limit 40 --open-browser
-python main.py studio --studio-mode 3d --live-feed --interval 30 --open-browser
+python main.py studio
+python main.py studio --studio-mode 3d --live-feed --interval 30
 :: http://127.0.0.1:8765/  ·  ?mode=3d
+:: no network: python main.py studio --offline-demo --limit 40
 ```
 
 **Workflow:** live map → fleet / shell filter → 2D/3D layers → **Save** frame → Library **Load** → Analyze → solar panels → optional Push DB.
@@ -157,7 +159,7 @@ See [`docs/DELTA_VIEW.md`](docs/DELTA_VIEW.md). UI: **Delta** mode · Arm baseli
 Vanished cells / optional NORAD loss = research proxy (e.g. post-flare fleet thinning) — **not** SSA collisions.
 
 ```bat
-python main.py studio --offline-demo --limit 40 --open-browser
+python main.py studio
 :: then: Save ≥2 snapshots → Compare newest, or Arm baseline → refresh → Live Δ
 ```
 

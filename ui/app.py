@@ -1553,6 +1553,7 @@ def create_handler(state: StudioState):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(data)
 
@@ -1561,10 +1562,17 @@ def create_handler(state: StudioState):
             if ".." in rel.split("/"):
                 _json_response(self, 403, {"status": "error", "message": "forbidden"})
                 return
+            base = STATIC_DIR.resolve()
             path = (STATIC_DIR / rel).resolve()
-            if not str(path).startswith(str(STATIC_DIR.resolve())):
-                _json_response(self, 403, {"status": "error", "message": "forbidden"})
-                return
+            # Windows: Path case can differ; reject escapes without false 403.
+            try:
+                path.relative_to(base)
+            except ValueError:
+                if not str(path).lower().startswith(str(base).lower()):
+                    _json_response(
+                        self, 403, {"status": "error", "message": "forbidden"}
+                    )
+                    return
             if not path.is_file():
                 _json_response(self, 404, {"status": "error", "message": "not found"})
                 return
@@ -1573,10 +1581,25 @@ def create_handler(state: StudioState):
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
+            # Avoid stale broken CSS/JS after a half-dead previous server process.
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(data)
 
     return StudioHandler
+
+
+class StudioHTTPServer(ThreadingHTTPServer):
+    """Threading server tuned for the studio boot burst (HTML+CSS+JS+APIs).
+
+    Default listen backlog is 5; the index page fans out ~15 parallel requests,
+    so CSS/JS often get dropped on Windows and the UI looks like a bare skeleton.
+    """
+
+    allow_reuse_address = True
+    daemon_threads = True
+    request_queue_size = 128
 
 
 def run_studio(
@@ -1588,7 +1611,16 @@ def run_studio(
 ) -> int:
     """Blocking studio server. Stops feeder on exit."""
     handler = create_handler(state)
-    httpd = ThreadingHTTPServer((host, port), handler)
+    try:
+        httpd = StudioHTTPServer((host, port), handler)
+    except OSError as e:
+        print(
+            f"Studio bind failed on {host}:{port}: {e}\n"
+            f"  Another process may still own the port (zombie after kill).\n"
+            f"  Windows: Get-NetTCPConnection -LocalPort {port} | % OwningProcess",
+            file=sys.stderr,
+        )
+        return 1
     url = f"http://{host}:{port}/"
     log.info("Studio listening %s", url)
     print(f"Karmin Satellite  {url}")
@@ -1616,5 +1648,9 @@ def run_studio(
         print("\nStudio stopped.")
     finally:
         state.stop_feeder()
+        try:
+            httpd.shutdown()
+        except Exception:
+            pass
         httpd.server_close()
     return 0

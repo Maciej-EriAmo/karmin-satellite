@@ -4,6 +4,9 @@ Karmin Satellite — entry point
 ============================
 Standalone product: thermal atom substrate + Starlink engine + solar context.
 
+  python main.py studio
+  python main.py studio --fleet oneweb --limit 200
+  python main.py studio --offline-demo --limit 40   # no network
   python main.py weather [--offline] [--force]
   python main.py predict [--offline] [--force]
   python main.py hazard  --offline-demo --limit 40
@@ -11,8 +14,6 @@ Standalone product: thermal atom substrate + Starlink engine + solar context.
   python main.py geo     --offline-demo --limit 40 --no-heatmap
   python main.py fleets
   python main.py --fleet oneweb --limit 200
-  python main.py studio  --fleet starlink --offline-demo --limit 40 --open-browser
-  python main.py         --offline-demo --limit 40 --hot-only
   python main.py --help
 
 Solar: engine/solar/ · fleets: engine/catalogs.py (H7 Celestrak).

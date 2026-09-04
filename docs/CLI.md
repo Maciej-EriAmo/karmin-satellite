@@ -55,7 +55,7 @@ Removed flag soup: `--weather` / `--predict` / `--hazard` → use subcommands.
 |------|---------|
 | `--host` | `127.0.0.1` |
 | `--port` | `8765` |
-| `--open-browser` | off |
+| `--open-browser` / `--no-open-browser` | **on** for `studio`; off for legacy `--studio` |
 | `--studio-mode 2d\|3d` | `2d` |
 | `--live-feed` | off |
 | `--interval SEC` | 900 |
@@ -89,10 +89,11 @@ See [`REACH_STUDIO.md`](REACH_STUDIO.md).
 python main.py --offline-demo --limit 40 --no-heatmap
 python main.py --limit 12000 --hot-only --html
 
-:: studio
-python main.py studio --offline-demo --limit 40 --open-browser
-python main.py studio --fleet oneweb --limit 200 --open-browser
-python main.py studio --limit 12000 --open-browser
+:: studio (normal — browser opens by default)
+python main.py studio
+python main.py studio --fleet oneweb --limit 200
+python main.py studio --limit 12000
+python main.py studio --offline-demo --limit 40
 
 :: solar / geo
 python main.py weather

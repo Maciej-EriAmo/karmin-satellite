@@ -180,7 +180,7 @@ class TestStudioAPI(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/", timeout=5) as r:
             self.assertEqual(r.status, 200)
             html = r.read().decode("utf-8")
-            self.assertIn("Cynober", html)
+            self.assertIn("Karmin", html)
             self.assertIn("btn-load-debris", html)
             self.assertIn("Load debris", html)
         with urllib.request.urlopen(self.base + "/static/heatmap.js", timeout=5) as r:

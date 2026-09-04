@@ -14,23 +14,24 @@ English: [`USER_GUIDE.en.md`](USER_GUIDE.en.md)
 cd /d C:\Users\drwis\karmin-satellite
 python -m pip install -r requirements.txt
 
-:: bez sieci (syntetyczne TLE)
-python main.py studio --offline-demo --limit 40 --open-browser
+:: normalny start (Celestrak / cache; przeglądarka otwiera się sama)
+python main.py studio
+python main.py studio --fleet debris --limit 400
 
-:: live Celestrak
-python main.py studio --limit 400 --open-browser
-python main.py studio --fleet debris --limit 400 --open-browser
+:: tylko gdy nie ma sieci (syntetyczne TLE — to NIE jest „tryb testowy programu”)
+python main.py studio --offline-demo --limit 40
 ```
 
-Domyślny port **8765**. Zatrzymanie: `Ctrl+C` w terminalu.
+Domyślny port **8765**. Zatrzymanie: `Ctrl+C` w terminalu.  
+Domyślny `--limit` to **400**. `studio` otwiera przeglądarkę; wyłączenie: `--no-open-browser`.
 
 | Flaga | Znaczenie |
 |-------|-----------|
-| `--offline-demo` | Bez sieci; syntetyczny katalog |
+| `--offline-demo` | Bez sieci; syntetyczny katalog (smoke/offline, nie normalny tryb) |
 | `--fleet ID` | `starlink`, `oneweb`, `debris`, `starlink,oneweb`, `all` |
 | `--limit N` | Ile obiektów wciągnąć. `0` = cały katalog (sufit 100 000) |
 | `--country CC` | Filtr SATCAT / heurystyka (`US`, `UK`, …) |
-| `--open-browser` | Otwórz UI |
+| `--open-browser` / `--no-open-browser` | Otwórz UI (dla `studio` domyślnie włączone) |
 | `--studio-mode 3d` | Start od globu |
 | `--live-feed` | Odświeżanie pozycji (domyślnie co 900 s) |
 

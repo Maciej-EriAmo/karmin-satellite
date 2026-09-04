@@ -14,23 +14,24 @@ Polish: [`USER_GUIDE.md`](USER_GUIDE.md)
 cd /d C:\Users\drwis\karmin-satellite
 python -m pip install -r requirements.txt
 
-:: no network (synthetic TLE)
-python main.py studio --offline-demo --limit 40 --open-browser
+:: normal start (Celestrak / cache; browser opens automatically)
+python main.py studio
+python main.py studio --fleet debris --limit 400
 
-:: live Celestrak
-python main.py studio --limit 400 --open-browser
-python main.py studio --fleet debris --limit 400 --open-browser
+:: only when offline (synthetic TLE — not a “test mode” of the app)
+python main.py studio --offline-demo --limit 40
 ```
 
-Default port **8765**. Stop with `Ctrl+C` in the terminal.
+Default port **8765**. Stop with `Ctrl+C` in the terminal.  
+Default `--limit` is **400**. `studio` opens the browser; disable with `--no-open-browser`.
 
 | Flag | Meaning |
 |------|---------|
-| `--offline-demo` | No network; synthetic catalog |
+| `--offline-demo` | No network; synthetic catalog (smoke/offline, not normal mode) |
 | `--fleet ID` | `starlink`, `oneweb`, `debris`, `starlink,oneweb`, `all` |
 | `--limit N` | How many objects to load. `0` = whole catalog (ceiling 100 000) |
 | `--country CC` | SATCAT / heuristic filter (`US`, `UK`, …) |
-| `--open-browser` | Open the UI |
+| `--open-browser` / `--no-open-browser` | Open the UI (on by default for `studio`) |
 | `--studio-mode 3d` | Start on the globe |
 | `--live-feed` | Re-propagate on a timer (default 900 s) |
 

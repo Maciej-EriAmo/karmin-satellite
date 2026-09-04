@@ -88,7 +88,14 @@ def _add_map_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--minutes", type=float, default=0.0)
     ap.add_argument("--heatmap", type=str, default="out/starlink_heat.png")
     ap.add_argument("--no-heatmap", action="store_true")
-    ap.add_argument("--offline-demo", action="store_true")
+    ap.add_argument(
+        "--offline-demo",
+        action="store_true",
+        help=(
+            "synthetic TLE, no network — offline smoke only. "
+            "Normal Studio: omit this flag (uses Celestrak / cache)"
+        ),
+    )
     ap.add_argument(
         "--fleet",
         type=str,
@@ -200,10 +207,20 @@ def _add_map_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--rpc-world", type=str, default=None)
 
 
-def _add_studio_args(ap: argparse.ArgumentParser) -> None:
+def _add_studio_args(
+    ap: argparse.ArgumentParser, *, default_open_browser: bool = False
+) -> None:
     ap.add_argument("--host", type=str, default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--open-browser", action="store_true")
+    ap.add_argument(
+        "--open-browser",
+        action=argparse.BooleanOptionalAction,
+        default=default_open_browser,
+        help=(
+            "open UI in the system browser "
+            "(default: on for `studio`, off for one-shot `--studio`)"
+        ),
+    )
     ap.add_argument(
         "--studio-mode",
         choices=("2d", "3d"),
@@ -531,7 +548,7 @@ def cmd_fleets(argv: Sequence[str]) -> int:
     print()
     print("usage:  python main.py --fleet oneweb --limit 200")
     print("merge:  python main.py --fleet starlink,oneweb --limit 400")
-    print("studio: python main.py studio --fleet iridium --offline-demo --limit 40")
+    print("studio: python main.py studio --fleet iridium")
     return 0
 
 
@@ -634,7 +651,7 @@ def cmd_run(argv: Sequence[str], *, studio: bool = False) -> int:
     ap = argparse.ArgumentParser(prog=prog, description=desc)
     _add_map_args(ap)
     if studio:
-        _add_studio_args(ap)
+        _add_studio_args(ap, default_open_browser=True)
     else:
         # allow legacy ``--studio`` on default run for one release
         ap.add_argument(
@@ -642,7 +659,7 @@ def cmd_run(argv: Sequence[str], *, studio: bool = False) -> int:
             action="store_true",
             help=argparse.SUPPRESS,
         )
-        _add_studio_args(ap)
+        _add_studio_args(ap, default_open_browser=False)
 
     args = ap.parse_args(list(argv))
     want_studio = studio or bool(getattr(args, "studio", False))
@@ -843,7 +860,7 @@ Usage:
   python main.py geo     [map opts]              # H5 alt-band + sunlit
   python main.py fleets                          # H7 list public catalogs
   python main.py timeline [--compare A B]        # B snapshot timeline
-  python main.py studio  [map opts] [--fleet F] [--country US] [--open-browser]
+  python main.py studio  [map opts] [--fleet F] [--country US]
   python main.py         [map opts]              # one-shot map (default)
   python main.py run     [map opts]              # same as default
 
@@ -857,11 +874,13 @@ Solar (engine.solar):
   timeline  B snapshot density timeline / compare
 
 Map / studio (examples):
-  python main.py --offline-demo --limit 40 --no-heatmap
+  python main.py studio
+  python main.py studio --fleet oneweb --limit 200
+  python main.py studio --fleet debris --limit 400
   python main.py --fleet oneweb --limit 200
   python main.py --fleet starlink --country US --limit 200
   python main.py --fleet starlink,oneweb --limit 400
-  python main.py studio --offline-demo --limit 40 --open-browser
+  python main.py studio --offline-demo --limit 40   # no network (synthetic TLE)
   python main.py hazard --offline-demo --limit 40 --offline
   python main.py report --offline-demo --limit 40 --offline --md --json
   python main.py geo --offline-demo --limit 40 --no-heatmap
