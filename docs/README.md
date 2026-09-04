@@ -11,6 +11,7 @@
 | [SLA_50K.md](SLA_50K.md) | design | 50k usable / 100k ceiling contract |
 | [ARCHITECTURE_LIMITS.md](ARCHITECTURE_LIMITS.md) | design | Scale numbers + measurement |
 | [KARMIN_SATELLITE_VERIFIED_PLAN.md](KARMIN_SATELLITE_VERIFIED_PLAN.md) | planning | Roadmap / status |
+| [DELTA_VIEW.md](DELTA_VIEW.md) | feature | Delta View — only changes A→B (2D/3D + live log) |
 | [PROJECT_STATUS.md](PROJECT_STATUS.md) | all | **COMPLETE** (2026-08-14) |
 | [REACH_STUDIO.md](REACH_STUDIO.md) | developer | Session reach · ghost · impact · live root |
 | [CODE_REVIEW.md](CODE_REVIEW.md) | quality | Review notes |

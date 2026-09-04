@@ -343,5 +343,91 @@
     wireGlobeLayers();
   }
 
-  window.CynoberGlobe = { show, refresh, loadCells, setLayer, getLayer: () => G.layer };
+  function latLonToVec(lat, lon, r) {
+    const phi = ((90 - lat) * Math.PI) / 180;
+    const theta = ((lon + 180) * Math.PI) / 180;
+    return new THREE.Vector3(
+      -r * Math.sin(phi) * Math.cos(theta),
+      r * Math.cos(phi),
+      r * Math.sin(phi) * Math.sin(theta)
+    );
+  }
+
+  function showDelta(delta) {
+    ensureThree(() => {
+      initScene();
+      if (!G.cellGroup) return;
+      while (G.cellGroup.children.length) {
+        const c = G.cellGroup.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+      }
+      const cells = (delta && delta.cells_changed) || [];
+      const nlat = Number(delta.nlat) || 36;
+      const nlon = Number(delta.nlon) || 72;
+      const dlat = 180 / nlat;
+      const dlon = 360 / nlon;
+      const maxAbs = Math.max(
+        1,
+        ...cells.map((c) => Math.abs(Number(c.delta) || 0))
+      );
+      cells.forEach((c) => {
+        const ilat = Number(c.ilat);
+        const ilon = Number(c.ilon);
+        if (!Number.isFinite(ilat) || !Number.isFinite(ilon)) return;
+        const lat0 = -90 + ilat * dlat;
+        const lon0 = -180 + ilon * dlon;
+        const lat1 = lat0 + dlat;
+        const lon1 = lon0 + dlon;
+        const r = 1.02;
+        const corners = [
+          latLonToVec(lat0, lon0, r),
+          latLonToVec(lat0, lon1, r),
+          latLonToVec(lat1, lon1, r),
+          latLonToVec(lat1, lon0, r),
+        ];
+        const positions = new Float32Array([
+          corners[0].x, corners[0].y, corners[0].z,
+          corners[1].x, corners[1].y, corners[1].z,
+          corners[2].x, corners[2].y, corners[2].z,
+          corners[0].x, corners[0].y, corners[0].z,
+          corners[2].x, corners[2].y, corners[2].z,
+          corners[3].x, corners[3].y, corners[3].z,
+        ]);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+        geo.computeVertexNormals();
+        const dlt = Number(c.delta) || 0;
+        const t = Math.min(1, Math.abs(dlt) / maxAbs);
+        const up = c.kind === "appeared" || dlt > 0;
+        const color = up
+          ? new THREE.Color(0.15 + 0.2 * t, 0.75 + 0.2 * t, 0.35)
+          : new THREE.Color(0.85 + 0.1 * t, 0.25, 0.3);
+        const mat = new THREE.MeshBasicMaterial({
+          color,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.5 + 0.45 * t,
+          depthWrite: false,
+        });
+        G.cellGroup.add(new THREE.Mesh(geo, mat));
+      });
+      const el = $("globe-meta");
+      if (el) {
+        el.textContent = `delta · +${delta.appeared || 0} / −${delta.vanished || 0} · cells ${cells.length} · research`;
+      }
+      const info = $("globe-layer-info");
+      if (info) info.textContent = "delta A→B (changes only)";
+      G.layer = "delta";
+    });
+  }
+
+  window.CynoberGlobe = {
+    show,
+    refresh,
+    loadCells,
+    setLayer,
+    showDelta,
+    getLayer: () => G.layer,
+  };
 })();

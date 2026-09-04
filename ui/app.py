@@ -34,7 +34,10 @@ Karmin Satellite HTTP server (stdlib only).
   GET  /api/fleets    → H7 public catalog list
   POST /api/fleet     → {fleet, country?} switch catalog (rebuild map)
   GET  /api/timeline  → B snapshot timeline metrics
-  GET  /api/timeline/compare?a=&b= → density delta between snapshots
+  GET  /api/timeline/compare?a=&b= → density delta between snapshots (alias)
+  GET  /api/delta?a=&b= → full delta (cells_changed + sats/hazard) + log append
+  GET  /api/delta/log → live change log ring buffer
+  POST /api/delta/baseline → capture current density as live baseline A
   GET  /api/alert     → EM storm watch (Kp/flare now or 6h) + crowding counts
 """
 from __future__ import annotations
@@ -45,11 +48,13 @@ import logging
 import mimetypes
 import sys
 import threading
+import time
 import traceback
+from collections import deque
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Deque, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -92,6 +97,82 @@ class StudioState:
     snapshot_dir: str = "out/snapshots"
     snapshot_retention_days: int = 7
     reach_mode: str = ""  # empty = env CYNOBER_REACH_MODE
+    # Delta View — live change log + optional baseline (A) for live-vs-now
+    change_log: Deque[Dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=200)
+    )
+    delta_baseline: Optional[dict] = None
+
+    def log_change(self, kind: str, message: str, **extra: Any) -> dict:
+        """Append one live log line (thread-safe)."""
+        entry = {
+            "ts": time.time(),
+            "iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "kind": str(kind),
+            "message": str(message),
+        }
+        if extra:
+            entry["extra"] = dict(extra)
+        with self.lock:
+            self.change_log.appendleft(entry)
+        log.info("delta-log [%s] %s", kind, message)
+        return entry
+
+    def capture_delta_baseline(self) -> dict:
+        """Snapshot current density (+ solar if cheap) as baseline A."""
+        with self.lock:
+            raw = getattr(self.amap, "density", None) or {}
+            if isinstance(raw, dict):
+                dens = [
+                    {"ilat": int(k[0]), "ilon": int(k[1]), "count": int(v)}
+                    for k, v in raw.items()
+                ]
+            else:
+                dens = list(raw)
+            try:
+                snap = self.amap.snapshot()
+                dens = list(snap.get("density") or dens)
+                nlat = snap.get("nlat")
+                nlon = snap.get("nlon")
+            except Exception:
+                nlat = nlon = None
+            payload = {
+                "format": "karmin-satellite-snapshot-v1",
+                "snapshot_id": f"baseline_{int(time.time())}",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "src": self.src,
+                "using": self.using,
+                "grid_deg": float(getattr(self.amap, "grid_deg", 5.0)),
+                "hot_only": bool(getattr(self.amap, "hot_only", True)),
+                "version": int(getattr(self.amap, "version", 0) or 0),
+                "nlat": nlat,
+                "nlon": nlon,
+                "density": dens,
+                "sats": [],  # cells-scale baseline — no O(N) dump
+                "shells": dict(getattr(self.amap, "shells", None) or {}),
+            }
+            try:
+                from engine.solar import assess_from_amap, get_space_weather
+
+                wx = get_space_weather(offline=self.offline_demo)
+                haz = assess_from_amap(self.amap, wx)
+                payload["solar"] = {
+                    "hazard": haz.as_dict() if hasattr(haz, "as_dict") else {},
+                }
+            except Exception as e:
+                log.debug("baseline solar skip: %s", e)
+            self.delta_baseline = payload
+        self.log_change(
+            "baseline",
+            f"baseline captured · cells={len(dens)} · id={payload['snapshot_id']}",
+            cells=len(dens),
+            snapshot_id=payload["snapshot_id"],
+        )
+        return {
+            "snapshot_id": payload["snapshot_id"],
+            "cells": len(dens),
+            "using": self.using,
+        }
 
     def refresh_catalog(
         self,
@@ -131,6 +212,34 @@ class StudioState:
             info["src"] = self.src
             info["using"] = self.using
             info["limit"] = self.limit
+            # Live delta log when baseline is armed
+            if self.delta_baseline is not None:
+                try:
+                    from engine.analytics import compare_density
+
+                    pb = self.amap.snapshot()
+                    pb["snapshot_id"] = "live_now"
+                    d = compare_density(self.delta_baseline, pb)
+                    lost_n = int((d.get("sats_delta") or {}).get("lost_n") or 0)
+                    self.log_change(
+                        "refresh",
+                        (
+                            f"refreshΔ appeared={d.get('appeared')} "
+                            f"vanished={d.get('vanished')} ΔΣ={d.get('delta_sum_count')} "
+                            f"sat_lost={lost_n}"
+                        ),
+                        appeared=d.get("appeared"),
+                        vanished=d.get("vanished"),
+                        sat_lost=lost_n,
+                    )
+                    info["delta_vs_baseline"] = {
+                        "appeared": d.get("appeared"),
+                        "vanished": d.get("vanished"),
+                        "delta_sum_count": d.get("delta_sum_count"),
+                        "sat_lost": lost_n,
+                    }
+                except Exception as e:
+                    log.debug("refresh delta log: %s", e)
             return info
 
     def attach_feeder(
@@ -736,7 +845,7 @@ def create_handler(state: StudioState):
                         log.warning("analyze geo: %s", e)
                 _json_response(self, 200, {"status": "ok", "data": payload})
                 return
-            if path == "/api/timeline":
+            if path in ("/api/timeline", "/api/timeline/compare", "/api/delta"):
                 from adapters.snapshot_store import SnapshotStore
                 from engine.analytics import compare_density, timeline_from_store
 
@@ -746,16 +855,93 @@ def create_handler(state: StudioState):
                 )
                 a_id = (qs.get("a") or qs.get("compare_a") or [None])[0]
                 b_id = (qs.get("b") or qs.get("compare_b") or [None])[0]
+                # Live baseline → now
+                if path == "/api/delta" and (
+                    str((qs.get("live") or ["0"])[0]).lower()
+                    in ("1", "true", "yes")
+                ):
+                    if state.delta_baseline is None:
+                        _json_response(
+                            self,
+                            400,
+                            {
+                                "status": "error",
+                                "message": "No baseline — POST /api/delta/baseline first",
+                            },
+                        )
+                        return
+                    try:
+                        with state.lock:
+                            pb = state.amap.snapshot()
+                            pb["snapshot_id"] = "live_now"
+                            pb["src"] = state.src
+                            pb["using"] = state.using
+                        data = compare_density(state.delta_baseline, pb)
+                        data["mode"] = "live_vs_baseline"
+                        data["a"]["snapshot_id"] = (
+                            state.delta_baseline.get("snapshot_id") or "baseline"
+                        )
+                        lost_n = int(
+                            (data.get("sats_delta") or {}).get("lost_n") or 0
+                        )
+                        state.log_change(
+                            "delta",
+                            (
+                                f"liveΔ appeared={data.get('appeared')} "
+                                f"vanished={data.get('vanished')} "
+                                f"ΔΣ={data.get('delta_sum_count')} "
+                                f"sat_lost={lost_n}"
+                            ),
+                            appeared=data.get("appeared"),
+                            vanished=data.get("vanished"),
+                            delta_sum=data.get("delta_sum_count"),
+                            sat_lost=lost_n,
+                        )
+                        _json_response(self, 200, {"status": "ok", "data": data})
+                    except Exception as e:
+                        log.warning("delta live: %s", e)
+                        _json_response(
+                            self, 500, {"status": "error", "message": str(e)}
+                        )
+                    return
                 if a_id and b_id:
                     try:
                         pa, pb = store.load_raw(str(a_id)), store.load_raw(str(b_id))
                         data = compare_density(pa, pb)
+                        if path == "/api/delta":
+                            lost_n = int(
+                                (data.get("sats_delta") or {}).get("lost_n") or 0
+                            )
+                            state.log_change(
+                                "delta",
+                                (
+                                    f"{a_id}→{b_id} appeared={data.get('appeared')} "
+                                    f"vanished={data.get('vanished')} "
+                                    f"ΔΣ={data.get('delta_sum_count')} "
+                                    f"sat_lost={lost_n}"
+                                ),
+                                a=str(a_id),
+                                b=str(b_id),
+                                appeared=data.get("appeared"),
+                                vanished=data.get("vanished"),
+                                sat_lost=lost_n,
+                            )
                         _json_response(self, 200, {"status": "ok", "data": data})
                     except Exception as e:
                         log.warning("timeline compare: %s", e)
                         _json_response(
                             self, 404, {"status": "error", "message": str(e)}
                         )
+                    return
+                if path in ("/api/delta", "/api/timeline/compare"):
+                    _json_response(
+                        self,
+                        400,
+                        {
+                            "status": "error",
+                            "message": "Need a=&b= snapshot ids, or live=1 with baseline",
+                        },
+                    )
                     return
                 try:
                     limit = int((qs.get("limit") or ["40"])[0])
@@ -766,6 +952,26 @@ def create_handler(state: StudioState):
                     self,
                     200,
                     {"status": "ok", "data": {"n": len(frames), "frames": frames}},
+                )
+                return
+            if path == "/api/delta/log":
+                try:
+                    limit = int((qs.get("limit") or ["40"])[0])
+                except ValueError:
+                    limit = 40
+                with state.lock:
+                    rows = list(state.change_log)[: max(1, min(limit, 200))]
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "status": "ok",
+                        "data": {
+                            "n": len(rows),
+                            "entries": rows,
+                            "has_baseline": state.delta_baseline is not None,
+                        },
+                    },
                 )
                 return
             if path == "/api/geo":
@@ -886,6 +1092,10 @@ def create_handler(state: StudioState):
         def _dispatch_post(self) -> None:
             parsed = urlparse(self.path)
             path = parsed.path or "/"
+            if path == "/api/delta/baseline":
+                info = state.capture_delta_baseline()
+                _json_response(self, 200, {"status": "ok", "data": info})
+                return
             if path == "/api/attention":
                 from engine.reach_studio import (
                     apply_live_scope,

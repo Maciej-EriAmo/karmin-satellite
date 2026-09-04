@@ -26,6 +26,7 @@ CLI default sample **400**. Capacity: `python tests\test_capacity.py`.
 | [`docs/KARMIN_SATELLITE_VERIFIED_PLAN.md`](docs/KARMIN_SATELLITE_VERIFIED_PLAN.md) | Roadmap / status |
 | [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) | Status · **COMPLETE** |
 | [`docs/REACH_STUDIO.md`](docs/REACH_STUDIO.md) | Session reach · flags · law (density vs view) |
+| [`docs/DELTA_VIEW.md`](docs/DELTA_VIEW.md) | **Delta View** — only changes (vanished/grew · hazard · live log) |
 
 ## Layout
 
@@ -149,6 +150,16 @@ python main.py --snapshot-load snap_YYYYMMDD... --no-heatmap
 ```
 
 Files: `out/snapshots/*.json` (gitignore). Save attaches **`solar`** meta by default.
+
+### Delta View (changes only)
+
+See [`docs/DELTA_VIEW.md`](docs/DELTA_VIEW.md). UI: **Delta** mode · Arm baseline · Live Δ · Change log.  
+Vanished cells / optional NORAD loss = research proxy (e.g. post-flare fleet thinning) — **not** SSA collisions.
+
+```bat
+python main.py studio --offline-demo --limit 40 --open-browser
+:: then: Save ≥2 snapshots → Compare newest, or Arm baseline → refresh → Live Δ
+```
 
 ### Optional Cynober DB RPC
 

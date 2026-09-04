@@ -30,6 +30,9 @@
     lastTick: null,
     liveRoot: false,
     attention: null,
+    deltaMode: false,
+    delta: null, // last /api/delta payload
+    deltaPoll: null,
   };
 
   function readLoadLimit() {
@@ -1101,15 +1104,194 @@
     }
     const a = frames[frames.length - 2].snapshot_id;
     const b = frames[frames.length - 1].snapshot_id;
-    const c = await fetchJSON(
-      `/api/timeline?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+    await runDeltaCompare(a, b);
+  }
+
+  function renderDeltaHazard(d) {
+    const strip = $("delta-hazard-strip");
+    const line = $("delta-haz-line");
+    const hz = (d && d.hazard_delta) || {};
+    if (!strip || !line) return;
+    if (!hz.available) {
+      strip.hidden = true;
+      return;
+    }
+    strip.hidden = false;
+    const a = hz.a || {};
+    const b = hz.b || {};
+    const ds =
+      hz.delta_score == null
+        ? "—"
+        : (hz.delta_score >= 0 ? "+" : "") + Number(hz.delta_score).toFixed(2);
+    line.textContent = `score ${a.score ?? "—"}→${b.score ?? "—"} (Δ ${ds}) · sev ${a.severity ?? "—"}→${b.severity ?? "—"}`;
+  }
+
+  function drawDeltaMap(d) {
+    const canvas = $("heatmap");
+    if (!canvas || !d) return;
+    const cells = d.cells_changed || [];
+    let nlat = Number(d.nlat) || state.nlat || 36;
+    let nlon = Number(d.nlon) || state.nlon || 72;
+    if (state.full) {
+      nlat = state.full.nlat || nlat;
+      nlon = state.full.nlon || nlon;
+    }
+    state.nlat = nlat;
+    state.nlon = nlon;
+    const wrap = $("map-wrap");
+    const availW = Math.max(
+      320,
+      (wrap && wrap.clientWidth) || canvas.parentElement?.clientWidth || 960
     );
-    const d = c.data || {};
+    const cellPx = Math.max(2, Math.floor(availW / nlon));
+    state.cellPx = cellPx;
+    const cssW = Math.max(1, nlon * cellPx);
+    const cssH = Math.max(1, nlat * cellPx);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.maxWidth = "100%";
+    canvas.style.height = "auto";
+    canvas.style.aspectRatio = `${nlon} / ${nlat}`;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssH * dpr));
+    canvas.style.imageRendering = cellPx >= 3 ? "pixelated" : "auto";
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#08060a";
+    ctx.fillRect(0, 0, cssW, cssH);
+    const maxAbs = Math.max(
+      1,
+      ...cells.map((c) => Math.abs(Number(c.delta) || 0))
+    );
+    cells.forEach((c) => {
+      const ilat = Number(c.ilat);
+      const ilon = Number(c.ilon);
+      if (!Number.isFinite(ilat) || !Number.isFinite(ilon)) return;
+      const dlt = Number(c.delta) || 0;
+      const t = Math.min(1, Math.abs(dlt) / maxAbs);
+      let fill;
+      if (c.kind === "appeared" || dlt > 0) {
+        fill = `rgba(${Math.round(40 + 80 * t)},${Math.round(180 + 60 * t)},${Math.round(90 + 40 * t)},${0.45 + 0.5 * t})`;
+      } else {
+        fill = `rgba(${Math.round(200 + 40 * t)},${Math.round(60 + 40 * (1 - t))},${Math.round(70 + 30 * (1 - t))},${0.45 + 0.5 * t})`;
+      }
+      ctx.fillStyle = fill;
+      ctx.fillRect(ilon * cellPx, (nlat - 1 - ilat) * cellPx, cellPx, cellPx);
+    });
     setText(
-      "timeline-info",
-      `compare ${a} → ${b}: ΔΣ=${d.delta_sum_count ?? "—"} grew=${d.grew} shrunk=${d.shrunk} new=${d.appeared} gone=${d.vanished}`
+      "map2d-title",
+      `delta · +${d.appeared || 0} / −${d.vanished || 0} · ΔΣ ${d.delta_sum_count ?? "—"}`
+    );
+    setText(
+      "map-px-info",
+      `delta cells ${cells.length} · px ${cellPx} · research · not SSA`
     );
   }
+
+  async function runDeltaCompare(a, b) {
+    const c = await fetchJSON(
+      `/api/delta?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+    );
+    const d = c.data || {};
+    state.delta = d;
+    const sat = d.sats_delta || {};
+    const satLine = sat.available
+      ? ` · sat lost ${sat.lost_n || 0} / new ${sat.gained_n || 0}`
+      : "";
+    setText(
+      "timeline-info",
+      `Δ ${a} → ${b}: ΔΣ=${d.delta_sum_count ?? "—"} grew=${d.grew} shrunk=${d.shrunk} new=${d.appeared} gone=${d.vanished}${satLine}`
+    );
+    renderDeltaHazard(d);
+    if (state.deltaMode) drawDeltaMap(d);
+    await loadDeltaLog();
+    if (window.CynoberGlobe && document.getElementById("panel-globe")?.style.display !== "none") {
+      window.CynoberGlobe.showDelta(d);
+    }
+    return d;
+  }
+
+  async function runDeltaLive() {
+    const c = await fetchJSON("/api/delta?live=1");
+    const d = c.data || {};
+    state.delta = d;
+    setText(
+      "timeline-info",
+      `liveΔ vs baseline: ΔΣ=${d.delta_sum_count ?? "—"} appeared=${d.appeared} vanished=${d.vanished}`
+    );
+    renderDeltaHazard(d);
+    if (state.deltaMode) drawDeltaMap(d);
+    await loadDeltaLog();
+    if (window.CynoberGlobe && document.getElementById("panel-globe")?.style.display !== "none") {
+      window.CynoberGlobe.showDelta(d);
+    }
+    return d;
+  }
+
+  async function armDeltaBaseline() {
+    const j = await fetchJSON("/api/delta/baseline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const d = (j && j.data) || {};
+    setText(
+      "timeline-info",
+      `baseline armed · ${d.snapshot_id || "—"} · cells ${d.cells ?? "—"}`
+    );
+    await loadDeltaLog();
+  }
+
+  async function loadDeltaLog() {
+    const j = await fetchJSON("/api/delta/log?limit=40");
+    const box = $("delta-log");
+    if (!box) return;
+    const entries = (j.data && j.data.entries) || [];
+    if (!entries.length) {
+      box.textContent = "(empty — arm baseline or compare snapshots)";
+      return;
+    }
+    box.textContent = entries
+      .map((e) => {
+        const t = (e.iso || "").replace("T", " ").replace("Z", "");
+        return `${t}  [${e.kind}] ${e.message}`;
+      })
+      .join("\n");
+  }
+
+  function enterDeltaMode() {
+    state.deltaMode = true;
+    setText("layer-info", "DELTA · only changes · green↑ red↓ · vanished ≈ density loss");
+    if (state.delta) drawDeltaMap(state.delta);
+    else {
+      compareNewestTimeline().catch(() =>
+        setText("timeline-info", "Save ≥2 snapshots or Arm baseline + Live Δ")
+      );
+    }
+    loadDeltaLog().catch(() => {});
+    if (state.deltaPoll) clearInterval(state.deltaPoll);
+    state.deltaPoll = setInterval(() => {
+      loadDeltaLog().catch(() => {});
+    }, 4000);
+  }
+
+  function leaveDeltaMode() {
+    state.deltaMode = false;
+    if (state.deltaPoll) {
+      clearInterval(state.deltaPoll);
+      state.deltaPoll = null;
+    }
+    const strip = $("delta-hazard-strip");
+    if (strip) strip.hidden = true;
+    if (state.full) drawFromPayload(state.full);
+  }
+
+  window.CynoberDelta = {
+    enter: enterDeltaMode,
+    leave: leaveDeltaMode,
+    compare: runDeltaCompare,
+    live: runDeltaLive,
+  };
 
   async function applyFilter() {
     const shell = state.shell || "all";
@@ -1551,6 +1733,12 @@
     });
     $("btn-timeline-compare")?.addEventListener("click", () => {
       compareNewestTimeline().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-delta-baseline")?.addEventListener("click", () => {
+      armDeltaBaseline().catch((e) => setText("err", String(e.message || e)));
+    });
+    $("btn-delta-live")?.addEventListener("click", () => {
+      runDeltaLive().catch((e) => setText("err", String(e.message || e)));
     });
     $("btn-layer-density")?.addEventListener("click", () => setLayer("density"));
     $("btn-layer-hazard")?.addEventListener("click", () => setLayer("hazard"));

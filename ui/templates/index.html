@@ -9,8 +9,8 @@
 <body>
   <header>
     <div>
-      <h1><span>Cynober</span> Studio</h1>
-      <div class="sub">thermal atoms · live root · T×reach · 50k SLA</div>
+      <h1><span>Karmin</span> Satellite</h1>
+      <div class="sub">thermal atoms · delta view · live root · 50k SLA</div>
     </div>
     <div class="header-badges">
       <span class="badge" id="badge-status">boot</span>
@@ -27,6 +27,7 @@
       <h2>View</h2>
       <div class="btns">
         <button type="button" id="btn-mode-2d" class="primary">2D heatmap</button>
+        <button type="button" id="btn-mode-delta" title="Only changes A→B · not full state">Delta</button>
         <button type="button" id="btn-mode-3d">3D globe</button>
       </div>
       <h2 style="margin-top:1rem">2D layer</h2>
@@ -140,14 +141,22 @@
       <div id="snap-list" class="snap-list"></div>
       <div class="sub" id="library-info"></div>
 
-      <h2 style="margin-top:1.2rem">Timeline (B)</h2>
-      <p class="sub" style="margin:0 0 .4rem">Density metrics across saved frames · compare last two</p>
+      <h2 style="margin-top:1.2rem">Timeline / Delta</h2>
+      <p class="sub" style="margin:0 0 .4rem">A→B changes only · vanished cells ≈ density loss (not SSA collisions)</p>
       <div class="btns">
         <button id="btn-timeline" type="button">Refresh timeline</button>
-        <button id="btn-timeline-compare" type="button" title="Compare two newest snapshots">Compare newest</button>
+        <button id="btn-timeline-compare" type="button" title="Compare two newest → Delta map">Compare newest</button>
+        <button id="btn-delta-baseline" type="button" title="Arm live baseline A">Arm baseline</button>
+        <button id="btn-delta-live" type="button" title="Baseline → now">Live Δ</button>
       </div>
       <div id="timeline-list" class="snap-list" style="max-height:140px"></div>
       <div class="sub" id="timeline-info"></div>
+      <div class="delta-hazard" id="delta-hazard-strip" hidden>
+        <span class="kicker">hazard Δ</span>
+        <span id="delta-haz-line">—</span>
+      </div>
+      <h3 style="margin:.8rem 0 .35rem;font-size:.85rem">Change log</h3>
+      <pre class="impact-log delta-log" id="delta-log">(arm baseline or compare snapshots — log fills live)</pre>
 
       <h2 style="margin-top:1.2rem">Analyze</h2>
       <div class="stat"><span>View cells</span><b id="an-cells">—</b></div>
@@ -278,19 +287,29 @@ depends_on lives on the cell atom — Impact reads the graph</pre>
       const mode = (params.get("mode") || "2d").toLowerCase();
       function setMode(m) {
         const is3 = m === "3d";
-        document.getElementById("badge-mode").textContent = is3 ? "3d" : "2d";
-        document.getElementById("btn-mode-2d").classList.toggle("primary", !is3);
+        const isDelta = m === "delta";
+        document.getElementById("badge-mode").textContent = is3
+          ? "3d"
+          : isDelta
+            ? "delta"
+            : "2d";
+        document.getElementById("btn-mode-2d").classList.toggle("primary", m === "2d");
+        document.getElementById("btn-mode-delta")?.classList.toggle("primary", isDelta);
         document.getElementById("btn-mode-3d").classList.toggle("primary", is3);
         if (window.CynoberGlobe) window.CynoberGlobe.show(is3);
+        if (window.CynoberDelta) {
+          if (isDelta) window.CynoberDelta.enter();
+          else window.CynoberDelta.leave();
+        }
         const u = new URL(location.href);
-        u.searchParams.set("mode", is3 ? "3d" : "2d");
+        u.searchParams.set("mode", is3 ? "3d" : isDelta ? "delta" : "2d");
         history.replaceState(null, "", u);
       }
       document.getElementById("btn-mode-2d").onclick = () => setMode("2d");
+      document.getElementById("btn-mode-delta").onclick = () => setMode("delta");
       document.getElementById("btn-mode-3d").onclick = () => setMode("3d");
-      if (mode === "3d") {
-        // wait for scripts
-        setTimeout(() => setMode("3d"), 0);
+      if (mode === "3d" || mode === "delta") {
+        setTimeout(() => setMode(mode), 0);
       }
     })();
   </script>

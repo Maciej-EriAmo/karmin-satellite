@@ -440,6 +440,32 @@ button.primary {
 .an-top b { color: var(--warm); font-variant-numeric: tabular-nums; }
 
 /* Heatmap: size set in JS (1:1 CSS px). No width:100% — that blurred the map. */
+.delta-hazard {
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: #1a1220;
+  border: 1px solid #3a2848;
+  font-size: 0.78rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.delta-hazard .kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  font-size: 0.68rem;
+}
+.delta-log {
+  max-height: 160px;
+  overflow: auto;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
 #heatmap {
   display: block;
   width: auto;
