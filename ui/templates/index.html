@@ -23,201 +23,257 @@
   </header>
 
   <main>
-    <aside class="panel">
-      <h2>View</h2>
-      <div class="btns">
-        <button type="button" id="btn-mode-2d" class="primary">2D heatmap</button>
-        <button type="button" id="btn-mode-delta" title="Only changes A→B · not full state">Delta</button>
-        <button type="button" id="btn-mode-3d">3D globe</button>
-      </div>
-      <h2 style="margin-top:1rem">2D layer</h2>
-      <div class="btns" id="layer-btns">
-        <button type="button" id="btn-layer-density" class="primary" title="Satellite density">Density</button>
-        <button type="button" id="btn-layer-hazard" title="Solar exposure proxy">Hazard</button>
-        <button type="button" id="btn-layer-blend" title="Density + hazard blend">Blend</button>
-        <button type="button" id="btn-layer-ghost" title="Retained TOMB / cold in session reach">Ghost</button>
-      </div>
-      <div class="sub" id="layer-info">density · solar overlay off</div>
-      <div class="sub" id="map-px-info" title="H8 adaptive cell size">cell px —</div>
+    <aside class="panel panel-side">
+      <details class="side-block" open>
+        <summary>View</summary>
+        <div class="side-body">
+          <div class="btns">
+            <button type="button" id="btn-mode-2d" class="primary">2D heatmap</button>
+            <button type="button" id="btn-mode-delta" title="Only changes A→B · not full state">Delta</button>
+            <button type="button" id="btn-mode-3d">3D globe</button>
+          </div>
+          <div class="side-label">2D layer</div>
+          <div class="btns" id="layer-btns">
+            <button type="button" id="btn-layer-density" class="primary" title="Satellite density">Density</button>
+            <button type="button" id="btn-layer-hazard" title="Solar exposure proxy">Hazard</button>
+            <button type="button" id="btn-layer-blend" title="Density + hazard blend">Blend</button>
+            <button type="button" id="btn-layer-ghost" title="Retained TOMB / cold in session reach">Ghost</button>
+          </div>
+          <div class="sub" id="layer-info">density · solar overlay off</div>
+          <div class="sub" id="map-px-info" title="Cell size tracks panel width (min 0.5px)">cell px —</div>
 
-      <h2 style="margin-top:1rem">3D layer</h2>
-      <div class="btns" id="globe-layer-btns">
-        <button type="button" id="btn-globe-density" class="primary" title="Density thermal on globe">Density</button>
-        <button type="button" id="btn-globe-radiation" title="Same 2D hazard overlay on the globe (solar score × density). Not physical dose.">Exposure</button>
-        <button type="button" id="btn-globe-blend" title="Density + exposure blend">Blend</button>
-      </div>
-      <div class="sub" id="globe-layer-info">density thermal</div>
-
-      <h2 style="margin-top:1.2rem">Stats</h2>
-      <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
-      <div class="stat"><span>Cells</span><b id="stat-cells">—</b></div>
-      <div class="stat"><span>Hot cells</span><b id="stat-hot">—</b></div>
-      <div class="stat"><span>Prop ms</span><b id="stat-prop">—</b></div>
-      <div class="stat"><span>Prop errors</span><b id="stat-errors">—</b></div>
-      <div class="stat"><span>Using</span><b id="stat-using">—</b></div>
-      <div class="stat"><span>Feeder</span><b id="stat-feeder">—</b></div>
-      <div class="stat"><span>TLE</span><b id="stat-src" style="font-size:.72rem;max-width:55%;text-align:right;word-break:break-all">—</b></div>
-
-      <h2 style="margin-top:1.2rem">Load satellites</h2>
-      <p class="sub" style="margin:0 0 .4rem">Public Celestrak · one fleet, merge, or all curated</p>
-      <label class="sub" for="fleet-select" style="display:block;margin:0 0 .2rem">Catalog / fleet</label>
-      <select id="fleet-select" class="ctl-select">
-        <option value="starlink">Starlink</option>
-      </select>
-      <label class="sub" for="country-select" style="display:block;margin:.45rem 0 .2rem">Country filter</label>
-      <select id="country-select" class="ctl-select">
-        <option value="">All countries</option>
-      </select>
-      <fieldset style="margin-top:.65rem">
-        <legend>Load limit · <span id="load-limit-val">400</span></legend>
-        <div class="btns limit-presets" id="limit-presets">
-          <button type="button" data-limit="400">400</button>
-          <button type="button" data-limit="2000">2k</button>
-          <button type="button" data-limit="10000">10k</button>
-          <button type="button" data-limit="50000" title="SLA usable budget">50k</button>
+          <div class="side-label">3D layer</div>
+          <div class="btns" id="globe-layer-btns">
+            <button type="button" id="btn-globe-density" class="primary" title="Density thermal on globe">Density</button>
+            <button type="button" id="btn-globe-radiation" title="Same 2D hazard overlay on the globe (solar score × density). Not physical dose.">Exposure</button>
+            <button type="button" id="btn-globe-blend" title="Density + exposure blend">Blend</button>
+          </div>
+          <div class="sub" id="globe-layer-info">density thermal</div>
         </div>
-        <input type="range" id="load-limit" min="40" max="50000" step="40" value="400"/>
-        <input type="number" id="load-limit-num" class="ctl-num" min="40" max="50000" step="40" value="400"/>
-        <div class="sub" style="margin-top:.25rem">40 … 50 000 (SLA usable) · or full catalog</div>
-        <label class="row" style="margin-top:.35rem">
-          <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling 100k)
-        </label>
-      </fieldset>
-      <div class="btns" style="margin-top:.5rem">
-        <button class="primary" id="btn-load-sats" type="button" title="Download / rebuild map from selected catalog and limit">Load satellites</button>
-        <button id="btn-load-debris" type="button" title="Public Celestrak debris clouds (FY-1C, Iridium 33, Cosmos 2251, Microsat-R, Cosmos 1408). Not Space-Track, not SSA.">Load debris</button>
-        <button id="btn-fleet-apply" type="button" title="Same as Load satellites">Reload</button>
-      </div>
-      <div class="sub" id="fleet-info">fleet — · limit —</div>
-      <div class="sub" id="debris-info">debris = 5 public event clouds · Celestrak GP · research only</div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Reach / Ghost</h2>
-      <p class="sub" style="margin:0 0 .4rem">Session root + retained TOMB — law: T says when, reach says whether</p>
-      <label class="row">
-        <input type="checkbox" id="reach-toggle"/> Reach view
-      </label>
-      <label class="row">
-        <input type="checkbox" id="ghost-under" checked/> Ghost under density
-      </label>
-      <div class="stat"><span>Reach</span><b id="stat-reach">off</b></div>
-      <div class="stat"><span>Ghost</span><b id="stat-ghost">—</b></div>
-      <div class="sub" id="reach-info">off · full density (SoT)</div>
-      <div class="btns">
-        <button type="button" id="btn-ghost-demo" title="Artificially cool a few sats in reach so the ghost layer has something to show">Demo: cool in reach</button>
-      </div>
-
-      <h2 style="margin-top:1.2rem">Filter (S4b)</h2>
-      <fieldset>
-        <legend>Shell</legend>
-        <div id="shell-radios">
-          <label class="row"><input type="radio" name="shell" value="all" checked/> All</label>
+      <details class="side-block">
+        <summary>Stats</summary>
+        <div class="side-body">
+          <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
+          <div class="stat"><span>Cells</span><b id="stat-cells">—</b></div>
+          <div class="stat"><span>Hot cells</span><b id="stat-hot">—</b></div>
+          <div class="stat"><span>Prop ms</span><b id="stat-prop">—</b></div>
+          <div class="stat"><span>Prop errors</span><b id="stat-errors">—</b></div>
+          <div class="stat"><span>Using</span><b id="stat-using">—</b></div>
+          <div class="stat"><span>Feeder</span><b id="stat-feeder">—</b></div>
+          <div class="stat"><span>TLE</span><b id="stat-src" class="stat-src">—</b></div>
         </div>
-      </fieldset>
-      <fieldset>
-        <legend>Min count · <span id="min-count-val">1</span></legend>
-        <input type="range" id="min-count" min="1" max="20" value="1"/>
-      </fieldset>
-      <div class="sub" id="filter-info">all · min≥1</div>
-      <div class="btns">
-        <button class="primary" id="btn-refresh" type="button">Refresh</button>
-        <button id="btn-impact" type="button" title="Simulate cooling the selected shell">Impact</button>
-        <button id="btn-reset" type="button">Reset filter</button>
-        <button id="btn-snapshot" type="button" title="Save snapshot on disk (out/snapshots)">Save server</button>
-        <button id="btn-export-json" type="button" title="Download current view as JSON file">JSON file</button>
-        <button id="btn-export-md" type="button" title="Download reach/ghost/density report as Markdown">MD file</button>
-        <button id="btn-rpc-push" type="button" hidden title="Optional Cynober DB — hidden unless the client is installed">Push DB</button>
-      </div>
-      <label class="row">
-        <input type="checkbox" id="export-sats"/> Include TLE in JSON file
-      </label>
-      <div class="sub" id="snap-info"></div>
-      <div class="error" id="err"></div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Library</h2>
-      <p class="sub" style="margin:0 0 .5rem">Snapshots = frames to load, filter, and view in 2D/3D.</p>
-      <div class="btns">
-        <button id="btn-snap-refresh" type="button">Refresh list</button>
-      </div>
-      <div id="snap-list" class="snap-list"></div>
-      <div class="sub" id="library-info"></div>
+      <details class="side-block" open>
+        <summary>Load satellites</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Public Celestrak · one fleet, merge, or all curated</p>
+          <label class="sub side-field-label" for="fleet-select">Catalog / fleet</label>
+          <select id="fleet-select" class="ctl-select">
+            <option value="starlink">Starlink</option>
+          </select>
+          <label class="sub side-field-label" for="country-select">Country filter</label>
+          <select id="country-select" class="ctl-select">
+            <option value="">All countries</option>
+          </select>
+          <fieldset>
+            <legend>Load limit · <span id="load-limit-val">400</span></legend>
+            <div class="btns limit-presets" id="limit-presets">
+              <button type="button" data-limit="400">400</button>
+              <button type="button" data-limit="2000">2k</button>
+              <button type="button" data-limit="10000">10k</button>
+              <button type="button" data-limit="50000" title="SLA usable budget">50k</button>
+            </div>
+            <input type="range" id="load-limit" min="40" max="50000" step="40" value="400"/>
+            <input type="number" id="load-limit-num" class="ctl-num" min="40" max="50000" step="40" value="400"/>
+            <div class="sub">40 … 50 000 (SLA usable) · or full catalog</div>
+            <label class="row">
+              <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling 100k)
+            </label>
+          </fieldset>
+          <div class="btns">
+            <button class="primary" id="btn-load-sats" type="button" title="Download / rebuild map from selected catalog and limit">Load satellites</button>
+            <button id="btn-load-debris" type="button" title="Public Celestrak debris clouds (FY-1C, Iridium 33, Cosmos 2251, Microsat-R, Cosmos 1408). Not Space-Track, not SSA.">Load debris</button>
+            <button id="btn-fleet-apply" type="button" title="Same as Load satellites">Reload</button>
+          </div>
+          <div class="sub" id="fleet-info">fleet — · limit —</div>
+          <div class="sub" id="debris-info">debris = 5 public event clouds · Celestrak GP · research only</div>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Timeline / Delta</h2>
-      <p class="sub" style="margin:0 0 .4rem">A→B changes only · vanished cells ≈ density loss (not SSA collisions)</p>
-      <div class="btns">
-        <button id="btn-timeline" type="button">Refresh timeline</button>
-        <button id="btn-timeline-compare" type="button" title="Compare two newest → Delta map">Compare newest</button>
-        <button id="btn-delta-baseline" type="button" title="Arm live baseline A">Arm baseline</button>
-        <button id="btn-delta-live" type="button" title="Baseline → now">Live Δ</button>
-      </div>
-      <div id="timeline-list" class="snap-list" style="max-height:140px"></div>
-      <div class="sub" id="timeline-info"></div>
-      <div class="delta-hazard" id="delta-hazard-strip" hidden>
-        <span class="kicker">hazard Δ</span>
-        <span id="delta-haz-line">—</span>
-      </div>
-      <h3 style="margin:.8rem 0 .35rem;font-size:.85rem">Change log</h3>
-      <pre class="impact-log delta-log" id="delta-log">(arm baseline or compare snapshots — log fills live)</pre>
+      <details class="side-block">
+        <summary>Reach / Ghost</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Session root + retained TOMB — law: T says when, reach says whether</p>
+          <label class="row">
+            <input type="checkbox" id="reach-toggle"/> Reach view
+          </label>
+          <label class="row">
+            <input type="checkbox" id="ghost-under" checked/> Ghost under density
+          </label>
+          <div class="stat"><span>Reach</span><b id="stat-reach">off</b></div>
+          <div class="stat"><span>Ghost</span><b id="stat-ghost">—</b></div>
+          <div class="sub" id="reach-info">off · full density (SoT)</div>
+          <div class="btns">
+            <button type="button" id="btn-ghost-demo" title="Artificially cool a few sats in reach so the ghost layer has something to show">Demo: cool in reach</button>
+          </div>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Analyze</h2>
-      <div class="stat"><span>View cells</span><b id="an-cells">—</b></div>
-      <div class="stat"><span>Σ count</span><b id="an-sum">—</b></div>
-      <div class="stat"><span>Max count</span><b id="an-max">—</b></div>
-      <div class="stat"><span>Hotspot</span><b id="an-hotspot" style="font-size:.72rem;max-width:58%;text-align:right">—</b></div>
-      <div class="stat"><span>p50 / p90</span><b id="an-pct">—</b></div>
-      <div id="an-top" class="an-top"></div>
+      <details class="side-block" open>
+        <summary>Filter</summary>
+        <div class="side-body">
+          <fieldset>
+            <legend>Shell</legend>
+            <div id="shell-radios">
+              <label class="row"><input type="radio" name="shell" value="all" checked/> All</label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Min count · <span id="min-count-val">1</span></legend>
+            <input type="range" id="min-count" min="1" max="20" value="1"/>
+          </fieldset>
+          <div class="sub" id="filter-info">all · min≥1</div>
+          <div class="btns">
+            <button class="primary" id="btn-refresh" type="button">Refresh</button>
+            <button id="btn-impact" type="button" title="Simulate cooling the selected shell">Impact</button>
+            <button id="btn-reset" type="button">Reset filter</button>
+            <button id="btn-snapshot" type="button" title="Save snapshot on disk (out/snapshots)">Save server</button>
+            <button id="btn-export-json" type="button" title="Download current view as JSON file">JSON file</button>
+            <button id="btn-export-md" type="button" title="Download reach/ghost/density report as Markdown">MD file</button>
+            <button id="btn-rpc-push" type="button" hidden title="Optional Cynober DB — hidden unless the client is installed">Push DB</button>
+          </div>
+          <label class="row">
+            <input type="checkbox" id="export-sats"/> Include TLE in JSON file
+          </label>
+          <div class="sub" id="snap-info"></div>
+          <div class="error" id="err"></div>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Solar weather</h2>
-      <p class="sub" style="margin:0 0 .5rem">Public NOAA SWPC · research proxy only</p>
-      <div class="stat"><span>Flare</span><b id="wx-flare">—</b></div>
-      <div class="stat"><span>F10.7</span><b id="wx-f107">—</b></div>
-      <div class="stat"><span>Kp</span><b id="wx-kp">—</b></div>
-      <div class="stat"><span>Mode</span><b id="wx-mode">—</b></div>
-      <div class="stat"><span>Stress</span><b id="wx-stress">—</b></div>
-      <div class="stat"><span>Severity</span><b id="wx-sev">—</b></div>
-      <div class="btns">
-        <button id="btn-weather" type="button">Refresh weather</button>
-      </div>
-      <div class="sub" id="wx-disclaimer" style="margin-top:.4rem"></div>
+      <details class="side-block">
+        <summary>Library</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Snapshots = frames to load, filter, and view in 2D/3D.</p>
+          <div class="btns">
+            <button id="btn-snap-refresh" type="button">Refresh list</button>
+          </div>
+          <div id="snap-list" class="snap-list"></div>
+          <div class="sub" id="library-info"></div>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Horizons (H3)</h2>
-      <p class="sub" style="margin:0 0 .5rem">1h / 6h / 24h · decay + short trend · research only</p>
-      <div id="predict-horizons" class="an-top"></div>
-      <div class="sub" id="predict-method" style="margin-top:.35rem"></div>
+      <details class="side-block">
+        <summary>Timeline / Delta</summary>
+        <div class="side-body">
+          <p class="sub side-hint">A→B changes only · vanished cells ≈ density loss (not SSA collisions)</p>
+          <div class="btns">
+            <button id="btn-timeline" type="button">Refresh timeline</button>
+            <button id="btn-timeline-compare" type="button" title="Compare two newest → Delta map">Compare newest</button>
+            <button id="btn-delta-baseline" type="button" title="Arm live baseline A">Arm baseline</button>
+            <button id="btn-delta-live" type="button" title="Baseline → now">Live Δ</button>
+          </div>
+          <div id="timeline-list" class="snap-list snap-list-sm"></div>
+          <div class="sub" id="timeline-info"></div>
+          <div class="delta-hazard" id="delta-hazard-strip" hidden>
+            <span class="kicker">hazard Δ</span>
+            <span id="delta-haz-line">—</span>
+          </div>
+          <h3 class="side-subhead">Change log</h3>
+          <pre class="impact-log delta-log" id="delta-log">(arm baseline or compare snapshots — log fills live)</pre>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Shell hazard</h2>
-      <div id="hazard-shell-list" class="an-top"></div>
+      <details class="side-block">
+        <summary>Analyze</summary>
+        <div class="side-body">
+          <div class="stat"><span>View cells</span><b id="an-cells">—</b></div>
+          <div class="stat"><span>Σ count</span><b id="an-sum">—</b></div>
+          <div class="stat"><span>Max count</span><b id="an-max">—</b></div>
+          <div class="stat"><span>Hotspot</span><b id="an-hotspot" class="stat-hotspot">—</b></div>
+          <div class="stat"><span>p50 / p90</span><b id="an-pct">—</b></div>
+          <div id="an-top" class="an-top"></div>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Altitude / sunlit (H5)</h2>
-      <p class="sub" style="margin:0 0 .5rem">Geometric proxy · not eclipse ephemeris</p>
-      <div class="stat"><span>Sunlit</span><b id="geo-sunlit">—</b></div>
-      <div class="stat"><span>Alt median</span><b id="geo-alt-med">—</b></div>
-      <div class="stat"><span>Alt range</span><b id="geo-alt-range">—</b></div>
-      <div class="sub" id="geo-badge" style="margin:.35rem 0"></div>
-      <div id="geo-bands" class="an-top"></div>
+      <details class="side-block">
+        <summary>Solar weather</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Public NOAA SWPC · research proxy only</p>
+          <div class="stat"><span>Flare</span><b id="wx-flare">—</b></div>
+          <div class="stat"><span>F10.7</span><b id="wx-f107">—</b></div>
+          <div class="stat"><span>Kp</span><b id="wx-kp">—</b></div>
+          <div class="stat"><span>Mode</span><b id="wx-mode">—</b></div>
+          <div class="stat"><span>Stress</span><b id="wx-stress">—</b></div>
+          <div class="stat"><span>Severity</span><b id="wx-sev">—</b></div>
+          <div class="btns">
+            <button id="btn-weather" type="button">Refresh weather</button>
+          </div>
+          <div class="sub" id="wx-disclaimer"></div>
+        </div>
+      </details>
 
-      <h2 style="margin-top:1.2rem">Shells</h2>
-      <div id="shell-list"></div>
+      <details class="side-block">
+        <summary>Horizons</summary>
+        <div class="side-body">
+          <p class="sub side-hint">1h / 6h / 24h · decay + short trend · research only</p>
+          <div id="predict-horizons" class="an-top"></div>
+          <div class="sub" id="predict-method"></div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>Shell hazard</summary>
+        <div class="side-body">
+          <div id="hazard-shell-list" class="an-top"></div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>Altitude / sunlit</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Geometric proxy · not eclipse ephemeris</p>
+          <div class="stat"><span>Sunlit</span><b id="geo-sunlit">—</b></div>
+          <div class="stat"><span>Alt median</span><b id="geo-alt-med">—</b></div>
+          <div class="stat"><span>Alt range</span><b id="geo-alt-range">—</b></div>
+          <div class="sub" id="geo-badge"></div>
+          <div id="geo-bands" class="an-top"></div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>Shells</summary>
+        <div class="side-body">
+          <div id="shell-list"></div>
+        </div>
+      </details>
     </aside>
 
     <section class="panel panel-viz" id="panel-heatmap">
       <h2>Map (2D) · <span id="map2d-title" class="sub">density</span></h2>
       <div class="wow-bar" id="wow-bar">
-        <button type="button" id="btn-live-wow" class="wow-toggle" title="Session is the only GC root — out of reach + cold = vacuum">Live root</button>
-        <button type="button" id="btn-commit-wow" class="wow-toggle" title="Cool outside session and tick — they vanish for real">Commit</button>
-        <button type="button" id="btn-restore-wow" title="Put catalog root back and re-ingest TLE">Restore</button>
-        <button type="button" id="btn-reach-wow" class="wow-toggle" title="Filter = session root, not a cropped PNG">Reach view</button>
-        <button type="button" id="btn-impact-wow" class="wow-toggle" title="What if this shell goes cold — simulate, density stays">Impact</button>
-        <button type="button" id="btn-tick-wow" class="wow-toggle" title="One Store.tick() + fleet status log. cool_hint is not applied. Not a control plane.">Fleet log</button>
-        <input type="search" id="resonance-q" class="wow-search" placeholder="Search · name or shell:53" title="Exact name / shell / fleet. HRR only when it actually hits."/>
-        <div class="wow-metric">live <b id="wow-live">catalog root</b></div>
-        <div class="wow-metric">reach <b id="wow-reach">off</b></div>
-        <div class="wow-metric">ghost <b id="wow-ghost">—</b></div>
-        <div class="wow-metric">impact <b id="wow-impact">—</b></div>
-        <div class="wow-metric">tick <b id="wow-tick">—</b></div>
-        <div class="wow-metric">density SoT <b id="wow-sot">—</b></div>
-        <div class="wow-actions">
-          <button type="button" id="btn-export-json-wow" title="Download JSON">JSON</button>
-          <button type="button" id="btn-export-md-wow" title="Download Markdown">MD</button>
+        <div class="wow-tools" role="toolbar" aria-label="Session tools">
+          <button type="button" id="btn-live-wow" class="wow-toggle" title="Session is the only GC root — out of reach + cold = vacuum">Live root</button>
+          <button type="button" id="btn-commit-wow" class="wow-toggle" title="Cool outside session and tick — they vanish for real">Commit</button>
+          <button type="button" id="btn-restore-wow" title="Put catalog root back and re-ingest TLE">Restore</button>
+          <button type="button" id="btn-reach-wow" class="wow-toggle" title="Filter = session root, not a cropped PNG">Reach view</button>
+          <button type="button" id="btn-impact-wow" class="wow-toggle" title="What if this shell goes cold — simulate, density stays">Impact</button>
+          <button type="button" id="btn-tick-wow" class="wow-toggle" title="One Store.tick() + fleet status log. cool_hint is not applied. Not a control plane.">Fleet log</button>
+          <input type="search" id="resonance-q" class="wow-search" placeholder="Search · name or shell:53" title="Exact name / shell / fleet. HRR only when it actually hits."/>
+          <div class="wow-actions">
+            <button type="button" id="btn-export-json-wow" title="Download JSON">JSON</button>
+            <button type="button" id="btn-export-md-wow" title="Download Markdown">MD</button>
+          </div>
+        </div>
+        <div class="wow-metrics" aria-label="Session metrics">
+          <div class="wow-metric">live <b id="wow-live">catalog root</b></div>
+          <div class="wow-metric">reach <b id="wow-reach">off</b></div>
+          <div class="wow-metric">ghost <b id="wow-ghost">—</b></div>
+          <div class="wow-metric">impact <b id="wow-impact">—</b></div>
+          <div class="wow-metric">tick <b id="wow-tick">—</b></div>
+          <div class="wow-metric">density SoT <b id="wow-sot">—</b></div>
         </div>
       </div>
       <div class="impact-panel live-panel" id="live-panel" hidden>
@@ -249,8 +305,8 @@ depends_on lives on the cell atom — Impact reads the graph</pre>
         <span class="leg-swatch reso"></span><span class="sub">resonance highlight</span>
         <span class="leg-swatch aura"></span><span class="sub">edge aura ∝ solar stress</span>
       </div>
-      <p class="sub" style="margin:.75rem 0 0">
-        Hover cell · adaptive px (few→large, many→~1px) · edge aura · poll every 5s.
+      <p class="sub map-hint">
+        Hover cell · cells scale with panel (min 0.5px) · edge aura · poll every 5s.
       </p>
     </section>
 
@@ -260,12 +316,12 @@ depends_on lives on the cell atom — Impact reads the graph</pre>
         <div class="globe-host" id="globe-host"></div>
         <div class="edge-aura" id="globe-aura" aria-hidden="true"></div>
       </div>
-      <div class="legend-row" id="globe-legend" style="margin-top:.5rem">
+      <div class="legend-row" id="globe-legend">
         <span class="leg-swatch dens"></span><span class="sub">density</span>
         <span class="leg-swatch haz"></span><span class="sub">exposure (same as 2D hazard)</span>
         <span class="leg-swatch aura"></span><span class="sub">edge aura ∝ solar stress</span>
       </div>
-      <p class="sub" style="margin:.75rem 0 0">
+      <p class="sub map-hint">
         Drag to rotate · scroll zoom · layers Density / Exposure / Blend
         (exposure = hazard overlay, not physical radiation).
       </p>

@@ -75,24 +75,16 @@
   // shared with globe.js for shell/min_count + layer handoff
   window.CynoberStudioState = state;
 
-  /**
-   * H8: CSS pixels per cell.
-   * - few sats → coarser integer blocks (readable demo / shell filter)
-   * - many sats → fill panel width (cell = availW/nlon), sharp density field
-   * Never: tiny buffer stretched to 100% (blur) or forced 18px on 12k.
-   */
-  function adaptiveCellPx({ nSats, nHotCells, nlon, availW }) {
-    const n = Math.max(1, Number(nSats) || Number(nHotCells) || 1);
-    const cols = Math.max(1, Number(nlon) || 72);
-    const fit = Math.max(1, (Number(availW) || 960) / cols); // float OK
+  /** Finest cell size (CSS px) when the panel is narrow or the grid is dense. */
+  const CELL_PX_MIN = 0.5;
 
-    // large catalog: one cell spans the panel evenly (sharp, no upscale blur)
-    if (n >= 2000) return fit;
-    if (n >= 800) return Math.min(3, fit);
-    if (n >= 200) return Math.min(5, fit);
-    if (n >= 80) return Math.min(7, fit);
-    // demo / tight filter
-    return Math.min(10, fit);
+  /**
+   * H8: cell size always tracks panel width so the sat view scales on resize.
+   * cellPx = availW / nlon (floor CELL_PX_MIN). Full cell rects, not fixed dots.
+   */
+  function adaptiveCellPx({ nlon, availW }) {
+    const cols = Math.max(1, Number(nlon) || 72);
+    return Math.max(CELL_PX_MIN, (Number(availW) || 960) / cols);
   }
 
   function tToRgb(T, T_MAX = 100) {
@@ -291,25 +283,19 @@
       320,
       (wrap && wrap.clientWidth) || canvas.parentElement?.clientWidth || 960
     );
-    const cellPx = adaptiveCellPx({
-      nSats: nSats || nHot,
-      nHotCells: nHot,
-      nlon,
-      availW,
-    });
+    // Cell size tracks panel width → sat view scales on resize (min 0.5px).
+    const cellPx = adaptiveCellPx({ nlon, availW });
     state.cellPx = cellPx;
 
-    // Exact CSS size = grid × cellPx (1:1). DPR buffer for retina sharpness.
     const cssW = Math.max(1, nlon * cellPx);
     const cssH = Math.max(1, nlat * cellPx);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.style.width = `${cssW}px`;
+    canvas.style.width = "100%";
     canvas.style.maxWidth = "100%";
     canvas.style.height = "auto";
     canvas.style.aspectRatio = `${nlon} / ${nlat}`;
     canvas.width = Math.max(1, Math.round(cssW * dpr));
     canvas.height = Math.max(1, Math.round(cssH * dpr));
-    // integer blocks when coarse; auto when filling panel (subpixel cells)
     canvas.style.imageRendering = cellPx >= 3 ? "pixelated" : "auto";
 
     const ctx = canvas.getContext("2d");
@@ -334,13 +320,15 @@
     const ch = cellPx;
     const mode = layer || "density";
     const gap = cellPx >= 5 ? 1 : 0;
+    const rw = Math.max(CELL_PX_MIN, cw - gap);
+    const rh = Math.max(CELL_PX_MIN, ch - gap);
 
     const paintGhost = (g, alpha) => {
       const [r, gv, b] = ghostToRgb(g.kind);
       ctx.fillStyle = `rgba(${r},${gv},${b},${alpha})`;
       const x = g.ilon * cellPx;
       const y = (nlat - 1 - g.ilat) * cellPx;
-      ctx.fillRect(x, y, Math.max(1, cellPx - gap), Math.max(1, cellPx - gap));
+      ctx.fillRect(x, y, rw, rh);
     };
 
     if (mode === "ghost") {
@@ -371,8 +359,6 @@
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       const x = d.ilon * cw;
       const y = (nlat - 1 - d.ilat) * ch;
-      const rw = Math.max(1, cw - gap);
-      const rh = Math.max(1, ch - gap);
       ctx.fillRect(x, y, rw, rh);
     }
     }
@@ -394,12 +380,12 @@
             : "rgba(255,196,64,0.9)";
         }
         ctx.strokeStyle = stroke;
-        ctx.lineWidth = Math.max(1.5, cellPx * 0.2);
+        ctx.lineWidth = Math.max(1, Math.min(2, cellPx * 0.15));
         ctx.strokeRect(
           x + 0.5,
           y + 0.5,
-          Math.max(1, cw - gap - 1),
-          Math.max(1, ch - gap - 1)
+          Math.max(CELL_PX_MIN, rw - 1),
+          Math.max(CELL_PX_MIN, rh - 1)
         );
       });
     });
@@ -430,7 +416,7 @@
         cellPx >= 2 && cellPx === Math.floor(cellPx)
           ? `${cellPx}px`
           : `${cellPx.toFixed(1)}px`;
-      pxInfo.textContent = `cell ${pxLabel} · n≈${nSats || nHot} · hot=${nHot}`;
+      pxInfo.textContent = `cell ${pxLabel} · scales w/ panel · n≈${nSats || nHot} · hot=${nHot}`;
     }
   }
 
@@ -1143,12 +1129,12 @@
       320,
       (wrap && wrap.clientWidth) || canvas.parentElement?.clientWidth || 960
     );
-    const cellPx = Math.max(2, Math.floor(availW / nlon));
+    const cellPx = adaptiveCellPx({ nlon, availW });
     state.cellPx = cellPx;
     const cssW = Math.max(1, nlon * cellPx);
     const cssH = Math.max(1, nlat * cellPx);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.style.width = `${cssW}px`;
+    canvas.style.width = "100%";
     canvas.style.maxWidth = "100%";
     canvas.style.height = "auto";
     canvas.style.aspectRatio = `${nlon} / ${nlat}`;
@@ -1157,6 +1143,7 @@
     canvas.style.imageRendering = cellPx >= 3 ? "pixelated" : "auto";
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = cellPx < 2;
     ctx.fillStyle = "#08060a";
     ctx.fillRect(0, 0, cssW, cssH);
     const maxAbs = Math.max(
@@ -1184,7 +1171,7 @@
     );
     setText(
       "map-px-info",
-      `delta cells ${cells.length} · px ${cellPx} · research · not SSA`
+      `delta cells ${cells.length} · cell ~${cellPx.toFixed(1)}px · scales w/ panel · research · not SSA`
     );
   }
 
@@ -1326,7 +1313,7 @@
     setText("stat-version", d.version);
     setText(
       "filter-info",
-      `${d.shell} · min≥${d.min_count} · cells ${d.count_cells} · ~${state.cellPx}px`
+      `${d.shell} · min≥${d.min_count} · cells ${d.count_cells} · cell ~${Number(state.cellPx || 0).toFixed(1)}px`
     );
     analyzeDensity(dens);
   }
@@ -1867,14 +1854,28 @@
         if (btn && j.data && j.data.available) btn.hidden = false;
       })
       .catch(() => {});
-    // re-fit adaptive cells when panel width changes
+    // re-fit cells when panel width changes (window or sidebar layout)
     let _rz = null;
-    window.addEventListener("resize", () => {
+    let _lastFitW = 0;
+    const refitMap = () => {
       clearTimeout(_rz);
       _rz = setTimeout(() => {
-        if (state.view) redrawMap();
-      }, 120);
-    });
+        const wrap = $("map-wrap");
+        const w = (wrap && wrap.clientWidth) || 0;
+        if (w && Math.abs(w - _lastFitW) < 1) return;
+        _lastFitW = w;
+        if (state.deltaMode && state.delta) drawDeltaMap(state.delta);
+        else if (state.view) redrawMap();
+      }, 80);
+    };
+    window.addEventListener("resize", refitMap);
+    if (typeof ResizeObserver !== "undefined") {
+      const wrap = $("map-wrap");
+      if (wrap) {
+        const ro = new ResizeObserver(() => refitMap());
+        ro.observe(wrap);
+      }
+    }
     applyEdgeAura(null, "");
     loadWeatherHazard(false).catch(() => {
       setText("badge-weather", "solar offline");
