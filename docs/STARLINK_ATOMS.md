@@ -1,9 +1,9 @@
 # Thermal atoms studio — engine contract
 
-**Project:** Cynober Studio · `engine/`  
+**Project:** Karmin Satellite · `engine/`  
 **Status:** MVP phases 0–5 + hazard H0–H8 + multi-fleet H7  
 **Language of this doc:** English  
-**Plan:** [CYNOBER_STUDIO_VERIFIED_PLAN.md](CYNOBER_STUDIO_VERIFIED_PLAN.md)  
+**Plan:** [KARMIN_SATELLITE_VERIFIED_PLAN.md](KARMIN_SATELLITE_VERIFIED_PLAN.md)  
 **Solar / fleets:** [HAZARD_LAYER.md](HAZARD_LAYER.md) · **CLI:** [CLI.md](CLI.md)
 
 ---
@@ -68,7 +68,7 @@ This is **not** an ops SSA product. It is a **substrate + research workbench** f
 ## Quick start
 
 ```powershell
-cd C:\Users\drwis\cynober_studio
+cd C:\Users\drwis\karmin-satellite
 pip install -r requirements.txt
 
 # Offline smoke
@@ -168,4 +168,4 @@ python tests\test_sphere.py
 
 ---
 
-*Home: Cynober Studio · private repo Maciej-EriAmo/cynober_studio*
+*Home: Karmin Satellite · private repo Maciej-EriAmo/karmin-satellite*

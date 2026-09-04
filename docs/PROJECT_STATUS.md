@@ -1,4 +1,4 @@
-# Cynober Studio — project status
+# Karmin Satellite — project status
 
 **Status: COMPLETE** (2026-08-14) — product closed. No open tracks.
 
@@ -43,4 +43,4 @@ python main.py --fleet starlink --country US --limit 200
 
 Docs: [CLI.md](CLI.md) · [HAZARD_LAYER.md](HAZARD_LAYER.md) · [README.md](../README.md)
 
-**MIT** — [Maciej-EriAmo/cynober_studio](https://github.com/Maciej-EriAmo/cynober_studio)  
+**MIT** — [Maciej-EriAmo/karmin-satellite](https://github.com/Maciej-EriAmo/karmin-satellite)  

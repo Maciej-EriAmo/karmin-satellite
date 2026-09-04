@@ -1,4 +1,4 @@
-# CLI reference — Cynober Studio
+# CLI reference — Karmin Satellite
 
 **Entry:** `python main.py` · module: `engine/cli.py`  
 **Principle:** solar / geo / fleets as **subcommands**; map build is the default command.

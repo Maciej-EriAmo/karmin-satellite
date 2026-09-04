@@ -1,4 +1,4 @@
-# Cynober Studio — szybki przegląd jakości (2026-08-11)
+# Karmin Satellite — szybki przegląd jakości (2026-08-11)
 
 **Zakres:** `engine/`, `ui/`, `tests/` (bez vendored `substrate/` — osobny kanon jądra).
 
@@ -29,7 +29,7 @@
 | Q2 | `refresh_catalog` gubi oryginalny `limit` przy `reload_tle` | HIGH | **DONE** (`StudioState.limit`) |
 | Q3 | Brak LiveFeeder (S3b) | HIGH | **DONE** (`engine/live_feeder.py`) |
 | Q4 | `except Exception` szerokie w handlerach (OK MVP, mało sygnału) | LOW | later |
-| Q5 | HTML report w silniku nadal marka „Karmazyn” w title | LOW | **DONE** (Cynober Studio) |
+| Q5 | HTML report w silniku nadal marka „Karmazyn” w title | LOW | **DONE** (Karmin Satellite) |
 | Q6 | UI poll 5s bez ETag/delta | LOW | later |
 | Q7 | `create_bubble` przy każdym shell — idempotentność zależy od store | LOW | OK w praktyce |
 | Q8 | Unused typing imports w `ui/app.py` | LOW | **DONE** |

@@ -341,7 +341,7 @@ class TestHazardReportH4(unittest.TestCase):
         self.assertEqual(len(d["groups"]), 3)  # constellation + 2 shells
         self.assertIn("predict", d)
         md = report.as_markdown()
-        self.assertIn("# Cynober Studio", md)
+        self.assertIn("# Karmin Satellite", md)
         self.assertIn("## Groups", md)
         self.assertIn("## Horizons", md)
         solar = report.solar_meta()

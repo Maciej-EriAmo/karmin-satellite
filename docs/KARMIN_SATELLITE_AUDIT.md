@@ -2,7 +2,7 @@
 
 **Status:** COMPLETED AUDIT  
 **Data:** 2026-08-10  
-**Autor:** Analiza krytyczna planu CYNOBER_STUDIO_PLAN.md
+**Autor:** Analiza krytyczna planu KARMIN_SATELLITE_PLAN.md
 
 ---
 
@@ -1289,7 +1289,7 @@ Ale brak:
 **Tool: Benchmark Suite**
 
 ```python
-# cynober_studio/tests/test_performance.py
+# karmin-satellite/tests/test_performance.py
 
 import tracemalloc
 import time
@@ -1616,12 +1616,12 @@ Ale:
 **Rekomendacja:**
 
 ```html
-<!-- cynober_studio/ui/templates/globe_3d.html -->
+<!-- karmin-satellite/ui/templates/globe_3d.html -->
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cynober Studio — Starlink 3D Globe</title>
+    <title>Karmin Satellite — Starlink 3D Globe</title>
     <style>
         body { margin: 0; overflow: hidden; }
         #globe { width: 100vw; height: 100vh; }
@@ -1785,7 +1785,7 @@ def main():
     
     # Studio mode
     if args.studio:
-        from cynober_studio.ui import create_app
+        from karmin-satellite.ui import create_app
         
         app = create_app(amap, studio_mode=args.studio_mode)
         
@@ -1839,7 +1839,7 @@ Brak:
 **Rekomendacja:**
 
 ```javascript
-// cynober_studio/ui/static/js/filters.js
+// karmin-satellite/ui/static/js/filters.js
 
 class FilterManager {
     constructor() {

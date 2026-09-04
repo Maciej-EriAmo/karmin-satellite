@@ -1,4 +1,4 @@
-/* Cynober Studio — 2D density canvas + filters */
+/* Karmin Satellite — 2D density canvas + filters */
 (() => {
   const $ = (id) => document.getElementById(id);
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-starlink_atoms — compatibility facade for Cynober Studio engine.
+starlink_atoms — compatibility facade for Karmin Satellite engine.
 
 Implementation lives in split modules:
   bootstrap, constants, tle, prop, grid, map, export_2d, build, lua_bridge, cli

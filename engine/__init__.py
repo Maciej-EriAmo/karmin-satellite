@@ -1,4 +1,4 @@
-"""Cynober Studio engine package."""
+"""Karmin Satellite engine package."""
 
 from __future__ import annotations
 

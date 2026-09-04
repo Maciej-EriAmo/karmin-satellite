@@ -3,7 +3,7 @@
 Optional Cynober DB RPC bridge for Studio snapshots (S1b remote).
 
 Local JSON store remains primary. This module pushes/pulls the same
-``cynober-studio-snapshot-v1`` payload over Cynober-Secure (KarminQL + KAFS media).
+``karmin-satellite-snapshot-v1`` payload over Cynober-Secure (KarminQL + KAFS media).
 
 Config (env):
   CYNOBER_HOST / CYNOBER_PORT     — direct endpoint (default 127.0.0.1:8080)
@@ -27,12 +27,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-log = logging.getLogger("cynober.studio.rpc")
+log = logging.getLogger("karmin.satellite.rpc")
 
 # Atom / media id prefix in Cynober worlds
 ATOM_PREFIX = "studio:snap:"
-BUBBLE_CATALOG = "CynoberStudioSnapshots"
-MIME_SNAPSHOT = "application/vnd.cynober.studio.snapshot+json"
+BUBBLE_CATALOG = "KarminSatelliteSnapshots"
+# Legacy bubble name (pre-rename) — pull may still find old remote blobs there.
+BUBBLE_CATALOG_LEGACY = "CynoberStudioSnapshots"
+MIME_SNAPSHOT = "application/vnd.karmin.satellite.snapshot+json"
+MIME_SNAPSHOT_LEGACY = "application/vnd.cynober.studio.snapshot+json"
+SNAPSHOT_FORMAT = "karmin-satellite-snapshot-v1"
+SNAPSHOT_FORMAT_LEGACY = "cynober-studio-snapshot-v1"
 
 
 class CynoberRpcError(RuntimeError):
@@ -101,7 +106,7 @@ def slim_payload_for_rpc(
     Full TLE catalog stays on local disk snapshots unless include_sats=True.
     """
     out = {
-        "format": payload.get("format") or "cynober-studio-snapshot-v1",
+        "format": payload.get("format") or SNAPSHOT_FORMAT,
         "snapshot_id": payload.get("snapshot_id"),
         "created_at": payload.get("created_at"),
         "src": payload.get("src"),

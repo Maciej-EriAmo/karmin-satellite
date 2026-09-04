@@ -1,7 +1,10 @@
-# Cynober Studio
+# Karmin Satellite
 
 Visual research studio for thermal atoms on public satellite catalogs (Starlink and multi-fleet).  
 **License:** [MIT](LICENSE).
+
+> Formerly **Cynober Studio** (`cynober_studio`). Repo: [Maciej-EriAmo/karmin-satellite](https://github.com/Maciej-EriAmo/karmin-satellite).  
+> Path: `C:\Users\drwis\karmin-satellite`. Data dir: `%LOCALAPPDATA%\KarminSatellite` (legacy `CynoberStudio` auto-renamed).
 
 Standalone like **Cynober DB**: own substrate + engine. **KarmazynOs is optional** (native slab, Lua tools).
 
@@ -20,14 +23,14 @@ CLI default sample **400**. Capacity: `python tests\test_capacity.py`.
 | [`docs/HAZARD_LAYER.md`](docs/HAZARD_LAYER.md) | Solar H0–H8 · multi-fleet H7 · UX |
 | [`docs/STARLINK_ATOMS.md`](docs/STARLINK_ATOMS.md) | Engine contract & layout |
 | [`docs/SLA_50K.md`](docs/SLA_50K.md) | Scale budgets |
-| [`docs/CYNOBER_STUDIO_VERIFIED_PLAN.md`](docs/CYNOBER_STUDIO_VERIFIED_PLAN.md) | Roadmap / status |
+| [`docs/KARMIN_SATELLITE_VERIFIED_PLAN.md`](docs/KARMIN_SATELLITE_VERIFIED_PLAN.md) | Roadmap / status |
 | [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) | Status · **COMPLETE** |
 | [`docs/REACH_STUDIO.md`](docs/REACH_STUDIO.md) | Session reach · flags · law (density vs view) |
 
 ## Layout
 
 ```
-cynober_studio/
+karmin-satellite/
 ├── main.py
 ├── substrate/                 # pure-Python thermal atom store
 ├── engine/
@@ -48,7 +51,7 @@ cynober_studio/
 ## Quick start
 
 ```bat
-cd /d C:\Users\drwis\cynober_studio
+cd /d C:\Users\drwis\karmin-satellite
 python -m pip install -r requirements.txt
 
 :: offline smoke
@@ -199,7 +202,7 @@ python main.py --limit 0 --prop sgp4 --hot-only --html out/starlink_report.html
 
 | Path | Role |
 |------|------|
-| `C:\Users\drwis\cynober_studio` | **This product** |
+| `C:\Users\drwis\karmin-satellite` | **This product** |
 | `C:\Users\drwis\DBase` | Cynober DB / Karmin_DB (skarbiec) |
 | `C:\Users\drwis\KarmazynOs` | Optional OS runtime (`KARMAZYN_OS` for Lua) |
 | `C:\Users\drwis\Karmin_Ae` | Agent SE memory (Holon), not runtime |

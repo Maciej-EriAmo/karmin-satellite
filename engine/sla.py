@@ -1,5 +1,5 @@
 """
-Cynober Studio — 50k SLA contract (design target = ARCH_USABLE_SATS).
+Karmin Satellite — 50k SLA contract (design target = ARCH_USABLE_SATS).
 
 Canonical numbers live here + docs/SLA_50K.md.
 Baseline measurements: docs/capacity_baseline.json · docs/ARCHITECTURE_LIMITS.md.

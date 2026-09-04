@@ -1,4 +1,4 @@
-"""Cynober Studio presentation layer (HTTP + 2D UI)."""
+"""Karmin Satellite presentation layer (HTTP + 2D UI)."""
 
 from __future__ import annotations
 

@@ -22,7 +22,7 @@ def _load(path: Path) -> unittest.TestSuite:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Cynober Studio unit tests")
+    p = argparse.ArgumentParser(description="Karmin Satellite unit tests")
     p.add_argument(
         "--full",
         action="store_true",

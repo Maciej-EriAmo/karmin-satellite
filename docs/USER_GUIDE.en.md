@@ -1,4 +1,4 @@
-# Cynober Studio — user guide
+# Karmin Satellite — user guide
 
 **UI language: English.** Button labels below match the screen.  
 Research workbench: public TLE density + solar context on thermal atoms. **Not** operational SSA, radiation certification, or Space-Track.
@@ -11,7 +11,7 @@ Polish: [`USER_GUIDE.md`](USER_GUIDE.md)
 ## 1. Start
 
 ```bat
-cd /d C:\Users\drwis\cynober_studio
+cd /d C:\Users\drwis\karmin-satellite
 python -m pip install -r requirements.txt
 
 :: no network (synthetic TLE)

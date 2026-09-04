@@ -1,15 +1,15 @@
-# Cynober Studio — Zweryfikowany plan
+# Karmin Satellite — Zweryfikowany plan
 
 **Status:** VERIFIED + PLAN  
 **Data:** 2026-08-11  
-**Źródła:** `engine/starlink_atoms.py`, `substrate/*`, `docs/CYNOBER_STUDIO_PLAN.md`, `docs/CYNOBER_STUDIO_AUDIT.md`, smoke offline  
-**Repo:** prywatne `Maciej-EriAmo/cynober_studio` · root `C:\Users\drwis\cynober_studio`
+**Źródła:** `engine/starlink_atoms.py`, `substrate/*`, `docs/KARMIN_SATELLITE_PLAN.md`, `docs/KARMIN_SATELLITE_AUDIT.md`, smoke offline  
+**Repo:** prywatne `Maciej-EriAmo/karmin-satellite` · root `C:\Users\drwis\karmin-satellite`
 
 ---
 
 ## 0. Cel produktu (jedno zdanie)
 
-**Cynober Studio** = samodzielny produkt (jak Cynober DB): silnik atomów termicznych + mapa gęstości (Starlink i inne katalogi) + warstwa wizualna (2D → 3D) + filtry; KarmazynOs opcjonalny most później.
+**Karmin Satellite** = samodzielny produkt (jak Cynober DB): silnik atomów termicznych + mapa gęstości (Starlink i inne katalogi) + warstwa wizualna (2D → 3D) + filtry; KarmazynOs opcjonalny most później.
 
 ---
 
@@ -121,10 +121,10 @@ VERIFY:
 ### A5. Studio jest niezależne od KarmazynOs
 
 ```
-ASSUME: cynober_studio startuje bez KarmazynOs (jak DB).
+ASSUME: karmin-satellite startuje bez KarmazynOs (jak DB).
 
 VERIFY (stan 2026-08-11):
-  ROOT = cynober_studio/
+  ROOT = karmin-satellite/
   sys.path ← substrate/   # vendored kernel pure-Python
   KARMAZYN_SUBSTRATE default = "python"
   main.py → engine.starlink_atoms.main()
@@ -256,7 +256,7 @@ PSEUDO S2b (później):
 ```
 ASSUME: snapshoty historii w Cynober DB / Karmin.
 
-VERIFY dziś: brak adaptera w cynober_studio.
+VERIFY dziś: brak adaptera w karmin-satellite.
 
 PSEUDO (później, po stabilnym API exportu):
   adapter.save(map):
@@ -330,7 +330,7 @@ VERIFY: tests/test_capacity.py → out/capacity_report.json
 | S3 | Data flow | **S3a MVP** → S3b z lock | live bez RLock = CRITICAL |
 | S4 | Interaction | **S4b** po API snapshot | shell index + density filter |
 | K0 | KarmazynOs | **opcjonalny most** | `KARMAZYN_OS`, nie import path domyślny |
-| K1 | Repo | **PRIVATE** | `github.com/Maciej-EriAmo/cynober_studio` |
+| K1 | Repo | **PRIVATE** | `github.com/Maciej-EriAmo/karmin-satellite` |
 
 ---
 
@@ -466,13 +466,13 @@ DONE WHEN:
 | Lua w core path | — | only KARMAZYN_OS bridge |
 | Public repo | — | stays **PRIVATE** |
 
-**Polish done after Faza 5:** rebrand HTML export, UI Save snapshot, docs paths → cynober_studio.
+**Polish done after Faza 5:** rebrand HTML export, UI Save snapshot, docs paths → karmin-satellite.
 
 ---
 
 ## 4b. Product mission (research workbench)
 
-**Cynober Studio** = kompletne **narzędzie badawcze dla pasjonatów** publicznego nieba:
+**Karmin Satellite** = kompletne **narzędzie badawcze dla pasjonatów** publicznego nieba:
 
 - mapa / obróbka / snapshoty (density SoT, shells, 2D/3D)
 - publiczna pogoda kosmiczna (NOAA SWPC) + hazard / predict / report / geo
@@ -507,7 +507,7 @@ PROJECT COMPLETE — optional only: deeper charts, more SATCAT fields, Space-Tra
 ## 5. Drzewo docelowe (ewolucja z obecnego)
 
 ```
-cynober_studio/
+karmin-satellite/
 ├── main.py
 ├── substrate/                 # L0 thermal store
 ├── engine/
@@ -603,4 +603,4 @@ To jest **jedyne** spójne założenie runtime. Wszystko inne (Three.js, Flask, 
 
 ---
 
-*Weryfikacja: kod `cynober_studio` 2026-08-11 · Plan autora w duchu CYNOBER_STUDIO_PLAN + twarde poprawki z AUDIT · Maciej / EriAmo*
+*Weryfikacja: kod `karmin-satellite` 2026-08-11 · Plan autora w duchu CYNOBER_STUDIO_PLAN + twarde poprawki z AUDIT · Maciej / EriAmo*

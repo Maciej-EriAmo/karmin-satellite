@@ -1,5 +1,5 @@
 """
-Cynober Studio substrate — pure-Python thermal atom engine.
+Karmin Satellite substrate — pure-Python thermal atom engine.
 
 Vendored from KarmazynOs kernel (atom / store / reach-GC).
 Standalone: no native Rust DLL required.

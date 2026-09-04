@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Cache i dane Cynober Studio — LOCALAPPDATA\\CynoberStudio."""
+"""Cache i dane Karmin Satellite — LOCALAPPDATA\\KarminSatellite."""
 from __future__ import annotations
 
 import os
@@ -9,13 +9,24 @@ from typing import Any, Dict, List
 
 
 def data_home() -> Path:
-    raw = (os.environ.get("CYNOBER_STUDIO_DATA_HOME") or "").strip()
+    raw = (
+        os.environ.get("KARMIN_SATELLITE_DATA_HOME")
+        or os.environ.get("CYNOBER_STUDIO_DATA_HOME")  # legacy alias
+        or ""
+    ).strip()
     if raw:
         return Path(raw).expanduser()
     local = (os.environ.get("LOCALAPPDATA") or "").strip()
     if local:
-        return Path(local) / "CynoberStudio"
-    return Path.home() / ".local" / "share" / "cynober_studio"
+        primary = Path(local) / "KarminSatellite"
+        legacy = Path(local) / "CynoberStudio"
+        if not primary.exists() and legacy.is_dir():
+            try:
+                legacy.rename(primary)
+            except OSError:
+                return legacy
+        return primary
+    return Path.home() / ".local" / "share" / "karmin-satellite"
 
 
 def cache_dir() -> Path:
@@ -60,7 +71,7 @@ def relocate_legacy(*, repo: Path | None = None) -> Dict[str, Any]:
     readme = data_home() / "README.txt"
     if not readme.is_file():
         readme.write_text(
-            "Cynober Studio data home — cache poza katalogiem projektu.\n",
+            "Karmin Satellite data home — cache poza katalogiem projektu.\n",
             encoding="utf-8",
         )
     return {"home": str(data_home()), "moved": moved}

@@ -1,4 +1,4 @@
-# Cynober Studio — Plan Kompletny (Substrate → Visual)
+# Karmin Satellite — Plan Kompletny (Substrate → Visual)
 
 **Celem:** Zaplanować architekturę wizualizacji dla 50–100k atomów Starlink (lub innych masowych obiektów) od warstwy substratu aż do graficznego interfejsu.
 
@@ -396,7 +396,7 @@ No implementation needed; skip.
 
 ### **FAZA 5: Integration & Studio App**
 
-**Cel:** Połączyć wszystkie warstwy w gotową aplikację: **Cynober Studio**.
+**Cel:** Połączyć wszystkie warstwy w gotową aplikację: **Karmin Satellite**.
 
 #### CLI Entry Point:
 ```bash
@@ -412,7 +412,7 @@ python starlink_atoms.py \
 
 #### Studio App struktura:
 ```
-cynober_studio/
+karmin-satellite/
 ├── main.py                    # CLI + server startup
 ├── substrate/
 │   ├── __init__.py
@@ -444,7 +444,7 @@ cynober_studio/
 
 #### Main entry:
 ```python
-# cynober_studio/main.py
+# karmin-satellite/main.py
 
 import argparse
 from flask import Flask, render_template, jsonify, request
@@ -581,9 +581,9 @@ Zaznacz wybory do kopii tego planu:
 
 Po wyborze wariantów, przygotuj:
 
-1. **CYNOBER_STUDIO_ARCH.md** — szczegółowa architektura (klasy, API, flowcharts)
-2. **CYNOBER_STUDIO_CODE_PHASE_X.md** — kod dla każdej fazy (nie komentarze, pełny kod)
-3. **CYNOBER_STUDIO_METRICS.md** — benchmarks i test suite
+1. **KARMIN_SATELLITE_ARCH.md** — szczegółowa architektura (klasy, API, flowcharts)
+2. **KARMIN_SATELLITE_CODE_PHASE_X.md** — kod dla każdej fazy (nie komentarze, pełny kod)
+3. **KARMIN_SATELLITE_METRICS.md** — benchmarks i test suite
 
 ---
 

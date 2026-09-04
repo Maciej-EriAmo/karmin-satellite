@@ -627,7 +627,7 @@ def _run_rpc_and_snapshots(args: argparse.Namespace, snap_store) -> Optional[int
 def cmd_run(argv: Sequence[str], *, studio: bool = False) -> int:
     prog = "main.py studio" if studio else "main.py"
     desc = (
-        "Cynober Studio HTTP UI"
+        "Karmin Satellite HTTP UI"
         if studio
         else "One-shot Starlink map build (default command)"
     )
@@ -833,7 +833,7 @@ def cmd_run(argv: Sequence[str], *, studio: bool = False) -> int:
 
 def _print_top_help() -> int:
     print(
-        """Cynober Studio
+        """Karmin Satellite
 
 Usage:
   python main.py weather [--offline] [--force]

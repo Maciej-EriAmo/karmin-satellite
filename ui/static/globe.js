@@ -1,4 +1,4 @@
-/* Cynober Studio — S2b / H6 3D globe (Three.js CDN)
+/* Karmin Satellite — S2b / H6 3D globe (Three.js CDN)
  *
  * Layers: density | radiation (H6 intensity) | blend
  * Radiation = solar score × density weight (same proxy as 2D hazard).

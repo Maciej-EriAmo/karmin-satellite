@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cynober Studio HTTP server (stdlib only).
+Karmin Satellite HTTP server (stdlib only).
 
   GET  /              → 2D heatmap UI
   GET  /static/*      → css/js
@@ -63,11 +63,11 @@ if str(_SUB) not in sys.path:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-log = logging.getLogger("cynober.studio")
+log = logging.getLogger("karmin.satellite")
 if not logging.root.handlers:
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s [cynober.studio] %(message)s",
+        format="%(asctime)s %(levelname)s [karmin.satellite] %(message)s",
     )
 
 
@@ -485,7 +485,7 @@ def create_handler(state: StudioState):
                     "country": state.country or "",
                     "countries": summ.get("countries") or {},
                     "fleets": summ.get("fleets") or {},
-                    "project": "Cynober Studio",
+                    "project": "Karmin Satellite",
                     "feeder": feeder_st,
                     "design_sats": SLA_USABLE_SATS,
                 }
@@ -699,7 +699,7 @@ def create_handler(state: StudioState):
                 )
                 data["tle_source"] = state.src
                 data["using"] = state.using
-                data["project"] = "Cynober Studio"
+                data["project"] = "Karmin Satellite"
                 _json_response(self, 200, {"status": "ok", "data": data})
                 return
             if path == "/api/snapshots":
@@ -827,7 +827,7 @@ def create_handler(state: StudioState):
                     200,
                     {
                         "status": "ok",
-                        "service": "cynober-studio",
+                        "service": "karmin-satellite",
                         "version": state.amap.get_export_version(),
                         "studio_mode": state.studio_mode,
                         "feeder": bool(
@@ -1381,7 +1381,7 @@ def run_studio(
     httpd = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     log.info("Studio listening %s", url)
-    print(f"Cynober Studio  {url}")
+    print(f"Karmin Satellite  {url}")
     print(
         f"  TLE={state.src}  fleet={state.fleet}  country={state.country or '—'}  "
         f"sats={state.using}  limit={state.limit}  version={state.amap.version}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local snapshot store for Cynober Studio (S1b MVP).
+Local snapshot store for Karmin Satellite (S1b MVP).
 
 Standalone file store under ``out/snapshots/`` (or custom dir) — no live
 Cynober server required. Optional remote Cynober bridge can wrap the same
@@ -120,7 +120,7 @@ class SnapshotStore:
             {"density": dens, "shells": shells}, sort_keys=True
         ).encode("utf-8")
         payload: Dict[str, Any] = {
-            "format": "cynober-studio-snapshot-v1",
+            "format": "karmin-satellite-snapshot-v1",
             "created_at": _utc_now().isoformat(),
             "src": src,
             "using": using or len(sats_out),
@@ -355,7 +355,7 @@ def load_snapshot_into_map(
     except Exception as e:
         import logging
 
-        logging.getLogger("cynober.studio").warning(
+        logging.getLogger("karmin.satellite").warning(
             "snapshot load: session attach skipped: %s", e
         )
     return store, amap, tle_sats, src

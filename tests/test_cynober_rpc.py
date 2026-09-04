@@ -80,7 +80,7 @@ class TestSlimPayload(unittest.TestCase):
         from adapters.cynober_rpc import slim_payload_for_rpc
 
         payload = {
-            "format": "cynober-studio-snapshot-v1",
+            "format": "karmin-satellite-snapshot-v1",
             "snapshot_id": "snap_test",
             "density": [{"ilat": 1, "ilon": 2, "count": 9}],
             "shells": {"shell:53": 3},

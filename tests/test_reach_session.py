@@ -359,7 +359,7 @@ class TestReachAPI(unittest.TestCase):
             self.assertIn("attachment", disp)
             self.assertIn(".json", disp)
             payload = json.loads(r.read().decode("utf-8"))
-        self.assertEqual(payload["format"], "cynober-studio-export-v1")
+        self.assertEqual(payload["format"], "karmin-satellite-export-v1")
         self.assertIn("density", payload)
         self.assertIn("reach", payload)
         self.assertIn("ghost", payload)
@@ -368,7 +368,7 @@ class TestReachAPI(unittest.TestCase):
             self.base + "/api/export?format=md", timeout=8
         ) as r:
             md = r.read().decode("utf-8")
-        self.assertIn("# Cynober Studio", md)
+        self.assertIn("# Karmin Satellite", md)
         self.assertIn("Session reach", md)
         self.assertIn("Ghost", md)
 

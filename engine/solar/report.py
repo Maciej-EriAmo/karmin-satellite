@@ -36,7 +36,7 @@ class HazardReport:
     """Portable group hazard document (research proxy)."""
 
     as_of: str
-    title: str = "Cynober Studio — Solar Hazard Report"
+    title: str = "Karmin Satellite — Solar Hazard Report"
     weather: dict = field(default_factory=dict)
     hazard: dict = field(default_factory=dict)
     predict: Optional[dict] = None

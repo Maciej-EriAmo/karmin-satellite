@@ -1,4 +1,4 @@
-# Cynober Studio — instrukcja obsługi
+# Karmin Satellite — instrukcja obsługi
 
 **UI language: English.** Etykiety przycisków poniżej są takie, jak na ekranie.  
 To jest prywatny warsztat badawczy: gęstość publicznych katalogów TLE + kontekst słoneczny na atomach termicznych. **Nie jest** operacyjnym SSA, certyfikatem radiacyjnym ani Space-Track.
@@ -11,7 +11,7 @@ English: [`USER_GUIDE.en.md`](USER_GUIDE.en.md)
 ## 1. Start
 
 ```bat
-cd /d C:\Users\drwis\cynober_studio
+cd /d C:\Users\drwis\karmin-satellite
 python -m pip install -r requirements.txt
 
 :: bez sieci (syntetyczne TLE)

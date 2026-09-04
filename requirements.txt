@@ -1,4 +1,4 @@
-# Cynober Studio — runtime
+# Karmin Satellite — runtime
 sgp4>=2.23
 Pillow>=10.0
 

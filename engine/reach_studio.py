@@ -643,7 +643,7 @@ def build_export_payload(
     ghost = collect_ghost(amap, state=state)
     created = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     payload: Dict[str, Any] = {
-        "format": "cynober-studio-export-v1",
+        "format": "karmin-satellite-export-v1",
         "created_at": created,
         "src": src,
         "using": int(using or 0),
@@ -708,7 +708,7 @@ def export_as_markdown(payload: Mapping[str, Any]) -> str:
     dens = payload.get("density") or []
     top = sorted(dens, key=lambda c: -int(c.get("count") or 0))[:8]
     lines = [
-        "# Cynober Studio — export",
+        "# Karmin Satellite — export",
         "",
         f"**as_of:** {payload.get('created_at') or '—'}  ",
         f"**format:** `{payload.get('format')}`  ",

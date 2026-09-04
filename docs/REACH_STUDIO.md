@@ -1,4 +1,4 @@
-# Reach Studio — relacyjność KarmazynOs w Cynober Studio
+# Reach Studio — relacyjność KarmazynOs w Karmin Satellite
 
 **Status:** COMPLETE — F0 + W1–W5 + **Live root** (session-only GC · `depends_on` graph)  
 **Kod:** `engine/reach_studio.py` · szwy: `engine/map.py`, `engine/build.py`, `ui/app.py`  
@@ -209,4 +209,4 @@ ciężki 3D ghost na start, obowiązkowy zapis reach do snapshotu.
 
 ---
 
-*Cynober Studio · reach = silnik uwagi na żywym grafie atomów, nie wycięty PNG.*
+*Karmin Satellite · reach = silnik uwagi na żywym grafie atomów, nie wycięty PNG.*

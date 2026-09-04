@@ -1,4 +1,4 @@
-# Cynober Studio — Granice architektury (skala)
+# Karmin Satellite — Granice architektury (skala)
 
 **Status:** MEASURED · **Data pomiaru:** 2026-08-11  
 **Maszyna:** Windows desktop · pure-Python Store · SGP4 · hot-only · grid 5°  
@@ -50,7 +50,7 @@ sufit (hard cap)            100k  ← nie przekraczamy w v1 bez decyzji
 Powtórzenie:
 
 ```bat
-cd /d C:\Users\drwis\cynober_studio
+cd /d C:\Users\drwis\karmin-satellite
 set CYNOBER_CAPACITY_CEILING=1
 python tests\test_capacity.py
 ```
@@ -173,4 +173,4 @@ Jeśli @50k: `prop_errors>0` **lub** `elapsed_s>=30` **lub** `peak_tracemalloc_m
 
 ---
 
-*Cynober Studio · granice = kontrakt skali · nie zgadujemy — mierzymy.*
+*Karmin Satellite · granice = kontrakt skali · nie zgadujemy — mierzymy.*

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cynober Studio — entry point
+Karmin Satellite — entry point
 ============================
 Standalone product: thermal atom substrate + Starlink engine + solar context.
 

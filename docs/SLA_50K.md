@@ -1,4 +1,4 @@
-# Cynober Studio — 50k SLA / Kontrakt skali
+# Karmin Satellite — 50k SLA / Kontrakt skali
 
 **Status:** ACTIVE · **SLA version:** 1.0.0 · **Date:** 2026-08-11  
 **Code:** `engine/sla.py` · **Scale canon:** `docs/ARCHITECTURE_LIMITS.md` · **Baseline:** `docs/capacity_baseline.json`  
@@ -93,7 +93,7 @@ Shape checks: `engine.sla.assert_api_payload_shape`.
 ## 6. How to verify / Jak weryfikować
 
 ```bat
-cd /d C:\Users\drwis\cynober_studio
+cd /d C:\Users\drwis\karmin-satellite
 python -m unittest tests.test_sla -v
 python tests\test_capacity.py
 :: optional ceiling:
@@ -118,4 +118,4 @@ Compare prop_ms / peak_mb @10k and @50k to `docs/capacity_baseline.json` after e
 
 ---
 
-*Cynober Studio · SLA 1.0.0 · design against 50k · measure, don’t guess.*
+*Karmin Satellite · SLA 1.0.0 · design against 50k · measure, don’t guess.*
