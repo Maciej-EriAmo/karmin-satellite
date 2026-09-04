@@ -47,7 +47,7 @@ Removed flag soup: `--weather` / `--predict` / `--hazard` → use subcommands.
 | `--snapshot-save [id]` | — | Write `out/snapshots/` (+ solar meta on save) |
 | `--snapshot-load id` | — | Load instead of TLE build |
 | `--snapshot-list` | — | List snapshots and exit |
-| `--rpc-health` / `--rpc-push` / `--rpc-pull` | — | Optional Cynober DB bridge |
+| `--rpc-health` / `--rpc-push` / `--rpc-pull` | — | Optional Cynober DB bridge (**cynober-db ≥ 8.2.5**) |
 
 ### Studio-only
 
@@ -112,11 +112,16 @@ python main.py --fleet starlink --country US --limit 200 --offline-demo --no-hea
 python main.py timeline
 python main.py timeline --compare snap_A snap_B
 
-:: snapshots / RPC
+:: snapshots / RPC (optional; needs cynober-db>=8.2.5)
 python main.py --offline-demo --limit 40 --snapshot-save
 python main.py --snapshot-list
+set CYNOBER_USER=admin
+set CYNOBER_TOKEN=…
 python main.py --rpc-health
 ```
+
+RPC env: `CYNOBER_HOST` / `PORT` / `PROFILE` / `WORLD` / `USER` / `TOKEN` · `CYNOBER_RPC=0` off.  
+See [README.md](../README.md#optional-cynober-db-rpc).
 
 ---
 

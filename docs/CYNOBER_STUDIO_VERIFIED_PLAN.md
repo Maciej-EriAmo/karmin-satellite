@@ -449,7 +449,7 @@ DONE WHEN:
 | Item | Priorytet | Notatka |
 |------|-----------|---------|
 | **TOR A — design against 50k SLA** | **DONE 2026-08-11** | `docs/SLA_50K.md` · `engine/sla.py` · `/api/sla` · capacity hard gates |
-| **Most RPC → żywy Cynober DB** | **DONE (optional)** | `adapters/cynober_rpc.py` · `--rpc-push/pull/health` · `/api/rpc/*` · density-first |
+| **Most RPC → żywy Cynober DB** | **DONE (optional)** | `adapters/cynober_rpc.py` · `--rpc-push/pull/health` · `/api/rpc/*` · density-first · **cynober-db ≥ 8.2.5** · `CYNOBER_USER`/`TOKEN` |
 | **Studio library/analyze/viz** | **DONE 2026-08-11** | Library load, Analyze, process+viz workflow |
 | **Hazard H0–H8 + multi-fleet H7** | **DONE 2026-08-12** | solar package · 3D radiation · adaptive UX · Celestrak fleets |
 | **A SATCAT/country** | **DONE 2026-08-12** | `engine/satcat.py` · `--country` · UI country select |

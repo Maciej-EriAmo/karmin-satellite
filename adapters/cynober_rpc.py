@@ -9,10 +9,13 @@ Config (env):
   CYNOBER_HOST / CYNOBER_PORT     — direct endpoint (default 127.0.0.1:8080)
   CYNOBER_PROFILE                — ~/.karmazyn_client.json profile name
   CYNOBER_WORLD                  — optional WYBIERZ ŚWIAT after connect
+  CYNOBER_USER / CYNOBER_TOKEN   — ZALOGUJ when server auth.json is enabled
   CYNOBER_DB / DBASE_PATH        — extra sys.path for cynober_client (dev tree)
   CYNOBER_RPC=0                  — force-disable even if client is importable
 
-Does NOT hard-depend on DBase at import time — soft import on connect.
+Requires **cynober-db ≥ 8.2.5** on the client path (8.2.4 PyPI wheel lacked
+``cynober_paths``). Does NOT hard-depend on DBase at import time — soft import
+on connect. Local ``out/snapshots`` remains primary.
 """
 from __future__ import annotations
 
@@ -167,11 +170,13 @@ class CynoberRpcBridge:
         *,
         world: Optional[str] = None,
         owned_client: bool = True,
+        auth_user: Optional[str] = None,
     ):
         self.client = client
         self.world = world
         self._owned = owned_client
         self._world_selected = False
+        self._auth_user = auth_user
 
     @classmethod
     def from_env(
@@ -181,11 +186,14 @@ class CynoberRpcBridge:
         port: Optional[int] = None,
         profile: Optional[str] = None,
         world: Optional[str] = None,
+        user: Optional[str] = None,
+        token: Optional[str] = None,
         timeout: float = 30.0,
     ) -> "CynoberRpcBridge":
         if not client_available():
             raise CynoberRpcError(
-                "cynober_client unavailable — install cynober-db or set CYNOBER_DB"
+                "cynober_client unavailable — install cynober-db>=8.2.5 "
+                "or set CYNOBER_DB to a DBase tree"
             )
         ensure_cynober_on_path()
         from cynober_client import connect
@@ -200,6 +208,12 @@ class CynoberRpcBridge:
         world = world if world is not None else (
             os.environ.get("CYNOBER_WORLD") or None
         )
+        user = user if user is not None else (
+            os.environ.get("CYNOBER_USER") or None
+        )
+        token = token if token is not None else (
+            os.environ.get("CYNOBER_TOKEN") or None
+        )
 
         if host and port:
             client = connect(host, int(port), timeout=timeout)
@@ -212,9 +226,29 @@ class CynoberRpcBridge:
             client = connect(timeout=timeout)
 
         br = cls(client, world=world or None, owned_client=True)
+        if user and token:
+            br.login(user, token)
+        elif user or token:
+            raise CynoberRpcError(
+                "RPC auth requires both CYNOBER_USER and CYNOBER_TOKEN "
+                "(server auth.json enabled)"
+            )
         if br.world:
             br.select_world(br.world)
         return br
+
+    def login(self, user: str, token: str) -> dict:
+        """ZALOGUJ against cynober-server when auth is enabled (8.2.5+)."""
+        u = str(user).strip()
+        t = str(token)
+        if not u or not t:
+            raise CynoberRpcError("login requires non-empty user and token")
+        row = self.client.query_line(f'ZALOGUJ "{_esc(u)}" TOKEN "{_esc(t)}"')
+        st = str((row or {}).get("status") or "").lower()
+        if st and st not in ("ok", "none"):
+            raise CynoberRpcError(f"ZALOGUJ failed: {row}")
+        self._auth_user = u
+        return row if isinstance(row, dict) else {"status": "ok", "user": u}
 
     def select_world(self, world: str, *, create: bool = False) -> dict:
         w = _esc(world)
@@ -246,6 +280,7 @@ class CynoberRpcBridge:
             "health": row,
             "session": info,
             "world": self.world,
+            "auth_user": self._auth_user,
             "kafs": bool(getattr(self.client, "kafs_enabled", False)),
         }
 
@@ -417,15 +452,27 @@ def rpc_status_dict() -> Dict[str, Any]:
     """Machine-readable availability for /api/rpc/status (no connect)."""
     path = ensure_cynober_on_path()
     avail = client_available()
+    has_user = bool(os.environ.get("CYNOBER_USER", "").strip())
+    has_token = bool(os.environ.get("CYNOBER_TOKEN", "").strip())
     return {
         "available": avail,
         "enabled_env": os.environ.get("CYNOBER_RPC", "1"),
         "cynober_db_path": str(path) if path else None,
+        "min_cynober_db": "8.2.5",
         "host": os.environ.get("CYNOBER_HOST") or None,
         "port": os.environ.get("CYNOBER_PORT") or None,
         "profile": os.environ.get("CYNOBER_PROFILE") or None,
         "world": os.environ.get("CYNOBER_WORLD") or None,
+        "auth_configured": has_user and has_token,
         "atom_prefix": ATOM_PREFIX,
-        "note_en": "Optional remote bridge; local out/snapshots remains primary.",
-        "note_pl": "Opcjonalny most zdalny; lokalne out/snapshots zostaje primary.",
+        "note_en": (
+            "Optional remote bridge (cynober-db>=8.2.5); "
+            "local out/snapshots remains primary. "
+            "Auth: CYNOBER_USER + CYNOBER_TOKEN when server auth.json is on."
+        ),
+        "note_pl": (
+            "Opcjonalny most zdalny (cynober-db≥8.2.5); "
+            "lokalne out/snapshots zostaje primary. "
+            "Auth: CYNOBER_USER + CYNOBER_TOKEN gdy auth.json włączone."
+        ),
     }

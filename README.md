@@ -149,7 +149,10 @@ Files: `out/snapshots/*.json` (gitignore). Save attaches **`solar`** meta by def
 
 ### Optional Cynober DB RPC
 
-Local snapshots stay primary. Optional density-first push/pull.
+Local snapshots stay primary. Optional density-first push/pull over **Cynober-Secure**.
+
+**Requires cynober-db ≥ 8.2.5** (`pip install -U "cynober-db>=8.2.5"` or `CYNOBER_DB` → DBase tree).  
+Do **not** use PyPI **8.2.4** (broken wheel: missing `cynober_paths`).
 
 ```bat
 python main.py --rpc-health
@@ -157,8 +160,18 @@ python main.py --offline-demo --limit 40 --snapshot-save --rpc-push
 python main.py --rpc-pull snap_YYYYMMDD...
 ```
 
-Env: `CYNOBER_HOST` / `PORT` / `PROFILE` / `WORLD` · `CYNOBER_RPC=0` disables.  
-Code: `adapters/cynober_rpc.py`.
+Env:
+
+| Variable | Role |
+|----------|------|
+| `CYNOBER_HOST` / `CYNOBER_PORT` | Direct endpoint (default port 8080) |
+| `CYNOBER_PROFILE` | `~/.karmazyn_client.json` profile |
+| `CYNOBER_WORLD` | `WYBIERZ ŚWIAT` after connect |
+| `CYNOBER_USER` / `CYNOBER_TOKEN` | `ZALOGUJ` when server `auth.json` is enabled |
+| `CYNOBER_RPC=0` | Disable bridge even if client importable |
+| `CYNOBER_DB` / `DBASE_PATH` | Dev path to DBase sources |
+
+Code: `adapters/cynober_rpc.py` · status: `GET /api/rpc/status` (`min_cynober_db`, `auth_configured`).
 
 ## Tests
 

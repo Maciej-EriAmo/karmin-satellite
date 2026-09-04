@@ -13,21 +13,33 @@ sys.path.insert(0, str(ROOT))
 
 
 class _FakeClient:
-    def __init__(self, *, kafs: bool = True):
+    def __init__(self, *, kafs: bool = True, accept_login: bool = True):
         self.kafs_enabled = kafs
         self.media: Dict[str, bytes] = {}
         self.queries: List[str] = []
         self.closed = False
+        self.accept_login = accept_login
+        self.logged_in: Optional[str] = None
 
     def query_line(self, text: str) -> dict:
         self.queries.append(text)
-        if text.strip().upper().startswith("ZDROWIE"):
+        u = text.strip().upper()
+        if u.startswith("ZALOGUJ"):
+            if not self.accept_login:
+                return {"status": "error", "message": "bad token"}
+            # Keep last quoted name as logged-in user for tests.
+            import re
+
+            m = re.search(r'ZALOGUJ\s+"([^"]+)"', text, re.I)
+            self.logged_in = m.group(1) if m else "user"
+            return {"status": "ok", "action": "LOGIN", "user": self.logged_in}
+        if u.startswith("ZDROWIE"):
             return {"status": "ok", "data": {"server_version": "test"}}
-        if text.strip().upper().startswith("WYBIERZ"):
+        if u.startswith("WYBIERZ"):
             return {"status": "ok", "action": "SELECT_WORLD"}
-        if text.strip().upper().startswith("UTRWAL"):
+        if u.startswith("UTRWAL"):
             return {"status": "ok"}
-        if "MEDIA PUT" in text.upper():
+        if "MEDIA PUT" in u:
             return {"status": "ok"}
         return {"status": "ok"}
 
@@ -132,6 +144,28 @@ class TestBridgeMock(unittest.TestCase):
         self.assertIn("available", d)
         self.assertIn("atom_prefix", d)
         self.assertIn("note_en", d)
+        self.assertEqual(d.get("min_cynober_db"), "8.2.5")
+        self.assertIn("auth_configured", d)
+
+    def test_login_ok(self):
+        from adapters.cynober_rpc import CynoberRpcBridge
+
+        client = _FakeClient()
+        br = CynoberRpcBridge(client, owned_client=False)
+        row = br.login("admin", "secret")
+        self.assertEqual(row.get("status"), "ok")
+        self.assertEqual(br._auth_user, "admin")
+        self.assertTrue(any(q.upper().startswith("ZALOGUJ") for q in client.queries))
+        h = br.health()
+        self.assertEqual(h.get("auth_user"), "admin")
+
+    def test_login_fail(self):
+        from adapters.cynober_rpc import CynoberRpcBridge, CynoberRpcError
+
+        client = _FakeClient(accept_login=False)
+        br = CynoberRpcBridge(client, owned_client=False)
+        with self.assertRaises(CynoberRpcError):
+            br.login("admin", "wrong")
 
 
 class TestStudioRpcStatusApi(unittest.TestCase):
