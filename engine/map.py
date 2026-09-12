@@ -19,7 +19,7 @@ from karmazyn_kernel import (  # noqa: E402
 
 from engine.constants import HAS_SGP4, S_CELL, S_SAT
 from engine.grid import _set_T, cell_id, density_to_T, latlon_to_bin, t_to_rgb
-from engine.prop import _wrap_lon, position_of, resolve_prop_mode
+from engine.prop import _wrap_lon, jd_fr_for, position_of, resolve_prop_mode
 from engine.tle import TleSat
 
 # alias for summary
@@ -49,6 +49,8 @@ class StarlinkAtomMap:
         self.state_changes = 0
         self._lock = RLock()
         self.version: int = 0
+        self._summary_cache: Optional[dict] = None
+        self._summary_cache_version: Optional[int] = None
         self._shells: Dict[str, int] = {}
         self._shell_index: Dict[str, Set[str]] = {}
         self._fleet_index: Dict[str, Set[str]] = {}
@@ -246,6 +248,14 @@ class StarlinkAtomMap:
         sat_to_cell: Dict[str, Tuple[int, int]] = {}
         errors: List[Tuple[int, str]] = []
         when = when or datetime.now(timezone.utc)
+        when_iso = when.isoformat()
+        # `when`/`minutes` are the same for the whole batch, so for sgp4 mode
+        # compute (jd, fr) once instead of once per satellite (jd_fr_for does
+        # a handful of attribute reads + a jday call -- cheap alone, not
+        # cheap x ARCH_USABLE_SATS).
+        jd = fr = None
+        if self.prop_mode == "sgp4":
+            jd, fr = jd_fr_for(when, minutes)
         for sat in sats:
             aid = f"sat:{sat.norad}"
             atom = self.store.get_atom(aid)
@@ -253,7 +263,7 @@ class StarlinkAtomMap:
                 continue
             try:
                 lat, lon, alt = position_of(
-                    sat, mode=self.prop_mode, when=when, minutes=minutes
+                    sat, mode=self.prop_mode, when=when, minutes=minutes, jd=jd, fr=fr
                 )
                 if (
                     lat is None
@@ -268,18 +278,16 @@ class StarlinkAtomMap:
             except Exception as e:
                 errors.append((sat.norad, str(e)[:120]))
                 continue
-            v = dict(atom.metadata.get("v") or {})
-            v.update(
-                {
-                    "lat": lat,
-                    "lon": lon,
-                    "alt_km": alt,
-                    "t_min": minutes,
-                    "prop": self.prop_mode,
-                    "when": when.isoformat(),
-                }
-            )
-            atom.metadata["v"] = v
+            v = atom.metadata.get("v")
+            if v is None:
+                v = {}
+                atom.metadata["v"] = v
+            v["lat"] = lat
+            v["lon"] = lon
+            v["alt_km"] = alt
+            v["t_min"] = minutes
+            v["prop"] = self.prop_mode
+            v["when"] = when_iso
             if heat_sats:
                 if hasattr(atom, "heat"):
                     atom.heat(3.0)
@@ -565,6 +573,9 @@ class StarlinkAtomMap:
             return self._summary_unlocked()
 
     def _summary_unlocked(self) -> dict:
+        cache_key = (self.version, self.state_changes)
+        if self._summary_cache is not None and self._summary_cache_version == cache_key:
+            return dict(self._summary_cache)
         n_sats = 0
         n_cells = 0
         hot_c = 0
@@ -576,7 +587,7 @@ class StarlinkAtomMap:
             kind = getattr(a, "S", None)
             if kind == S_SAT:
                 n_sats += 1
-                v = dict(a.metadata.get("v") or {})
+                v = a.metadata.get("v") or {}
                 fk = str(v.get("fleet") or "starlink")
                 fleets[fk] = fleets.get(fk, 0) + 1
                 ck = str(v.get("country") or "?").upper()
@@ -592,7 +603,7 @@ class StarlinkAtomMap:
                     max_cell = a
         st = self.store.stats() if callable(getattr(self.store, "stats", None)) else {}
         err_rate = (self.last_error_sats / n_sats) if n_sats else 0.0
-        return {
+        result = {
             "sats": n_sats,
             "cells": n_cells,
             "hot_cells": hot_c,
@@ -621,3 +632,6 @@ class StarlinkAtomMap:
             ),
             "store": st,
         }
+        self._summary_cache = result
+        self._summary_cache_version = cache_key
+        return dict(result)

@@ -67,24 +67,36 @@ def position_approx(sat: TleSat, minutes_from_epoch: float = 0.0) -> Tuple[float
     return lat, lon, alt
 
 
+def jd_fr_for(when: Optional[datetime], minutes: float = 0.0) -> Tuple[float, float]:
+    """(jd, fr) for `when` shifted by `minutes`. Shared so a batch of satellites
+    propagated for the same instant can compute this once instead of per-sat."""
+    base = when or datetime.now(timezone.utc)
+    if minutes:
+        base = datetime.fromtimestamp(base.timestamp() + minutes * 60.0, tz=timezone.utc)
+    return sgp4_jday(
+        base.year,
+        base.month,
+        base.day,
+        base.hour,
+        base.minute,
+        base.second + base.microsecond * 1e-6,
+    )
+
+
 def position_sgp4(
     sat: TleSat,
     when: Optional[datetime] = None,
+    *,
+    jd: Optional[float] = None,
+    fr: Optional[float] = None,
 ) -> Optional[Tuple[float, float, float]]:
     if not HAS_SGP4:
         return None
     rec = sat.ensure_satrec()
     if rec is None:
         return None
-    when = when or datetime.now(timezone.utc)
-    jd, fr = sgp4_jday(
-        when.year,
-        when.month,
-        when.day,
-        when.hour,
-        when.minute,
-        when.second + when.microsecond * 1e-6,
-    )
+    if jd is None or fr is None:
+        jd, fr = jd_fr_for(when)
     err, r, _v = rec.sgp4(jd, fr)
     if err != 0 or r is None:
         return None
@@ -107,14 +119,13 @@ def position_of(
     mode: str,
     when: Optional[datetime] = None,
     minutes: float = 0.0,
+    jd: Optional[float] = None,
+    fr: Optional[float] = None,
 ) -> Tuple[float, float, float]:
     if mode == "sgp4":
-        base = when or datetime.now(timezone.utc)
-        if minutes:
-            base = datetime.fromtimestamp(
-                base.timestamp() + minutes * 60.0, tz=timezone.utc
-            )
-        pos = position_sgp4(sat, base)
+        if jd is None or fr is None:
+            jd, fr = jd_fr_for(when, minutes)
+        pos = position_sgp4(sat, jd=jd, fr=fr)
         if pos is not None:
             return pos
         raise ValueError("sgp4_failed")
