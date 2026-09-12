@@ -13,7 +13,6 @@ from karmazyn_kernel import open_store  # noqa: E402
 
 from engine.constants import (
     ARCH_CEILING_SATS,
-    ARCH_MAX_SATS,
     ARCH_USABLE_SATS,
     DEFAULT_LIMIT,
 )
@@ -76,7 +75,7 @@ def build_map(
 
     # A: country annotation + optional filter (before hard limit trim when country set)
     if satcat or country:
-        from engine.satcat import SatcatIndex, country_counts, filter_by_country
+        from engine.satcat import SatcatIndex, filter_by_country
 
         idx = SatcatIndex(allow_network=not offline_demo).load()
         n_sc, n_fb = idx.annotate_sats(full)

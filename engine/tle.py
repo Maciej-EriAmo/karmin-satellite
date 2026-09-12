@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Tuple
 
-from engine.catalogs import default_cache_path, get_fleet, parse_fleet_list
+from engine.catalogs import get_fleet, parse_fleet_list
 from engine.constants import CELESTRAK_URLS, HAS_SGP4, Satrec, USER_AGENT
 
 # Default inclinations for offline multi-fleet demos

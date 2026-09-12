@@ -42,7 +42,6 @@ Karmin Satellite HTTP server (stdlib only).
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import mimetypes
@@ -1098,7 +1097,6 @@ def create_handler(state: StudioState):
                 return
             if path == "/api/attention":
                 from engine.reach_studio import (
-                    apply_live_scope,
                     attention_status,
                     commit_attention,
                     restore_catalog,

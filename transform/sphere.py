@@ -13,7 +13,7 @@ Layers:
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from engine.grid import cell_id, density_to_T, t_to_rgb
 

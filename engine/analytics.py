@@ -6,9 +6,7 @@ Compare density frames over time without re-prop.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 def _density_map(payload: dict) -> Dict[Tuple[int, int], int]:

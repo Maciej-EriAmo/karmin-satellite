@@ -7,7 +7,7 @@ Primary: Celestrak GROUP=… TLE. Optional merge of several fleets.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 # Public Celestrak endpoints (no auth).

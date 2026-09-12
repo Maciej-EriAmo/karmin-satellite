@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
@@ -278,7 +278,6 @@ def load_snapshot_into_map(
     ensure_paths()
     from karmazyn_kernel import open_store
 
-    from engine.grid import cell_id, density_to_T
     from engine.map import StarlinkAtomMap
     from engine.tle import TleSat
 

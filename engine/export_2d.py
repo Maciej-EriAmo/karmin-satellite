@@ -6,7 +6,7 @@ import json
 import math
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from engine.grid import density_to_T, t_to_rgb
 from engine.map import StarlinkAtomMap

@@ -13,10 +13,8 @@ ensure_paths()
 from karmazyn_kernel import (  # noqa: E402
     T_HOT,
     T_INIT,
-    T_MAX,
     T_TOMB,
     T_WARM,
-    state_for_T,
 )
 
 from engine.constants import HAS_SGP4, S_CELL, S_SAT
