@@ -148,7 +148,7 @@ class TestStudioAPI(unittest.TestCase):
         self.assertIn("groups", d)
         self.assertIn("weather", d)
         self.assertIn("markdown", d)
-        self.assertIn("# Cynober", d["markdown"])
+        self.assertIn("# Karmin Satellite", d["markdown"])
         self.assertIn("solar", d)
         self.assertIn("hazard", d["solar"])
 
