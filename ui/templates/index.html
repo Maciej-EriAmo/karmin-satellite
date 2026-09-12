@@ -24,6 +24,13 @@
 
   <main>
     <aside class="panel panel-side">
+      <div class="side-tabs" role="tablist" aria-label="Sidebar sections">
+        <button type="button" class="side-tab-btn active" data-side-tab="view" role="tab" aria-selected="true">View</button>
+        <button type="button" class="side-tab-btn" data-side-tab="data" role="tab" aria-selected="false">Data</button>
+        <button type="button" class="side-tab-btn" data-side-tab="analysis" role="tab" aria-selected="false">Analysis</button>
+      </div>
+
+      <div class="side-tab" data-side-tab-panel="view">
       <details class="side-block" open>
         <summary>View</summary>
         <div class="side-body">
@@ -49,76 +56,6 @@
             <button type="button" id="btn-globe-blend" title="Density + exposure blend">Blend</button>
           </div>
           <div class="sub" id="globe-layer-info">density thermal</div>
-        </div>
-      </details>
-
-      <details class="side-block">
-        <summary>Stats</summary>
-        <div class="side-body">
-          <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
-          <div class="stat"><span>Cells</span><b id="stat-cells">—</b></div>
-          <div class="stat"><span>Hot cells</span><b id="stat-hot">—</b></div>
-          <div class="stat"><span>Prop ms</span><b id="stat-prop">—</b></div>
-          <div class="stat"><span>Prop errors</span><b id="stat-errors">—</b></div>
-          <div class="stat"><span>Using</span><b id="stat-using">—</b></div>
-          <div class="stat"><span>Feeder</span><b id="stat-feeder">—</b></div>
-          <div class="stat"><span>TLE</span><b id="stat-src" class="stat-src">—</b></div>
-        </div>
-      </details>
-
-      <details class="side-block" open>
-        <summary>Load satellites</summary>
-        <div class="side-body">
-          <p class="sub side-hint">Public Celestrak · one fleet, merge, or all curated</p>
-          <label class="sub side-field-label" for="fleet-select">Catalog / fleet</label>
-          <select id="fleet-select" class="ctl-select">
-            <option value="starlink">Starlink</option>
-          </select>
-          <label class="sub side-field-label" for="country-select">Country filter</label>
-          <select id="country-select" class="ctl-select">
-            <option value="">All countries</option>
-          </select>
-          <fieldset>
-            <legend>Load limit · <span id="load-limit-val">400</span></legend>
-            <div class="btns limit-presets" id="limit-presets">
-              <button type="button" data-limit="400">400</button>
-              <button type="button" data-limit="2000">2k</button>
-              <button type="button" data-limit="10000">10k</button>
-              <button type="button" data-limit="50000" title="SLA usable budget">50k</button>
-            </div>
-            <input type="range" id="load-limit" min="40" max="50000" step="40" value="400"/>
-            <input type="number" id="load-limit-num" class="ctl-num" min="40" max="50000" step="40" value="400"/>
-            <div class="sub">40 … 50 000 (SLA usable) · or full catalog</div>
-            <label class="row">
-              <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling 100k)
-            </label>
-          </fieldset>
-          <div class="btns">
-            <button class="primary" id="btn-load-sats" type="button" title="Download / rebuild map from selected catalog and limit">Load satellites</button>
-            <button id="btn-load-debris" type="button" title="Public Celestrak debris clouds (FY-1C, Iridium 33, Cosmos 2251, Microsat-R, Cosmos 1408). Not Space-Track, not SSA.">Load debris</button>
-            <button id="btn-fleet-apply" type="button" title="Same as Load satellites">Reload</button>
-          </div>
-          <div class="sub" id="fleet-info">fleet — · limit —</div>
-          <div class="sub" id="debris-info">debris = 5 public event clouds · Celestrak GP · research only</div>
-        </div>
-      </details>
-
-      <details class="side-block">
-        <summary>Reach / Ghost</summary>
-        <div class="side-body">
-          <p class="sub side-hint">Session root + retained TOMB — law: T says when, reach says whether</p>
-          <label class="row">
-            <input type="checkbox" id="reach-toggle"/> Reach view
-          </label>
-          <label class="row">
-            <input type="checkbox" id="ghost-under" checked/> Ghost under density
-          </label>
-          <div class="stat"><span>Reach</span><b id="stat-reach">off</b></div>
-          <div class="stat"><span>Ghost</span><b id="stat-ghost">—</b></div>
-          <div class="sub" id="reach-info">off · full density (SoT)</div>
-          <div class="btns">
-            <button type="button" id="btn-ghost-demo" title="Artificially cool a few sats in reach so the ghost layer has something to show">Demo: cool in reach</button>
-          </div>
         </div>
       </details>
 
@@ -154,14 +91,21 @@
       </details>
 
       <details class="side-block">
-        <summary>Library</summary>
+        <summary>Reach / Ghost</summary>
         <div class="side-body">
-          <p class="sub side-hint">Snapshots = frames to load, filter, and view in 2D/3D.</p>
+          <p class="sub side-hint">Session root + retained TOMB — law: T says when, reach says whether</p>
+          <label class="row">
+            <input type="checkbox" id="reach-toggle"/> Reach view
+          </label>
+          <label class="row">
+            <input type="checkbox" id="ghost-under" checked/> Ghost under density
+          </label>
+          <div class="stat"><span>Reach</span><b id="stat-reach">off</b></div>
+          <div class="stat"><span>Ghost</span><b id="stat-ghost">—</b></div>
+          <div class="sub" id="reach-info">off · full density (SoT)</div>
           <div class="btns">
-            <button id="btn-snap-refresh" type="button">Refresh list</button>
+            <button type="button" id="btn-ghost-demo" title="Artificially cool a few sats in reach so the ghost layer has something to show">Demo: cool in reach</button>
           </div>
-          <div id="snap-list" class="snap-list"></div>
-          <div class="sub" id="library-info"></div>
         </div>
       </details>
 
@@ -185,7 +129,74 @@
           <pre class="impact-log delta-log" id="delta-log">(arm baseline or compare snapshots — log fills live)</pre>
         </div>
       </details>
+      </div>
 
+      <div class="side-tab" data-side-tab-panel="data" hidden>
+      <details class="side-block" open>
+        <summary>Load satellites</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Public Celestrak · one fleet, merge, or all curated</p>
+          <label class="sub side-field-label" for="fleet-select">Catalog / fleet</label>
+          <select id="fleet-select" class="ctl-select">
+            <option value="starlink">Starlink</option>
+          </select>
+          <label class="sub side-field-label" for="country-select">Country filter</label>
+          <select id="country-select" class="ctl-select">
+            <option value="">All countries</option>
+          </select>
+          <fieldset>
+            <legend>Load limit · <span id="load-limit-val">400</span></legend>
+            <div class="btns limit-presets" id="limit-presets">
+              <button type="button" data-limit="400">400</button>
+              <button type="button" data-limit="2000">2k</button>
+              <button type="button" data-limit="10000">10k</button>
+              <button type="button" data-limit="50000" title="SLA usable budget">50k</button>
+            </div>
+            <input type="range" id="load-limit" min="40" max="50000" step="40" value="400"/>
+            <input type="number" id="load-limit-num" class="ctl-num" min="40" max="50000" step="40" value="400"/>
+            <div class="sub">40 … 50 000 (SLA usable) · or full catalog</div>
+            <label class="row">
+              <input type="checkbox" id="load-limit-full"/> Full catalog (limit=0, arch ceiling 100k)
+            </label>
+          </fieldset>
+          <div class="btns">
+            <button class="primary" id="btn-load-sats" type="button" title="Download / rebuild map from selected catalog and limit">Load satellites</button>
+            <button id="btn-load-debris" type="button" title="Public Celestrak debris clouds (FY-1C, Iridium 33, Cosmos 2251, Microsat-R, Cosmos 1408). Not Space-Track, not SSA.">Load debris</button>
+            <button id="btn-fleet-apply" type="button" title="Same as Load satellites">Reload</button>
+          </div>
+          <div class="sub" id="fleet-info">fleet — · limit —</div>
+          <div class="sub" id="debris-info">debris = 5 public event clouds · Celestrak GP · research only</div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>Library</summary>
+        <div class="side-body">
+          <p class="sub side-hint">Snapshots = frames to load, filter, and view in 2D/3D.</p>
+          <div class="btns">
+            <button id="btn-snap-refresh" type="button">Refresh list</button>
+          </div>
+          <div id="snap-list" class="snap-list"></div>
+          <div class="sub" id="library-info"></div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>Stats</summary>
+        <div class="side-body">
+          <div class="stat"><span>Sats</span><b id="stat-sats">—</b></div>
+          <div class="stat"><span>Cells</span><b id="stat-cells">—</b></div>
+          <div class="stat"><span>Hot cells</span><b id="stat-hot">—</b></div>
+          <div class="stat"><span>Prop ms</span><b id="stat-prop">—</b></div>
+          <div class="stat"><span>Prop errors</span><b id="stat-errors">—</b></div>
+          <div class="stat"><span>Using</span><b id="stat-using">—</b></div>
+          <div class="stat"><span>Feeder</span><b id="stat-feeder">—</b></div>
+          <div class="stat"><span>TLE</span><b id="stat-src" class="stat-src">—</b></div>
+        </div>
+      </details>
+      </div>
+
+      <div class="side-tab" data-side-tab-panel="analysis" hidden>
       <details class="side-block">
         <summary>Analyze</summary>
         <div class="side-body">
@@ -249,6 +260,7 @@
           <div id="shell-list"></div>
         </div>
       </details>
+      </div>
     </aside>
 
     <section class="panel panel-viz" id="panel-heatmap">

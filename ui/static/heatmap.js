@@ -33,7 +33,89 @@
     deltaMode: false,
     delta: null, // last /api/delta payload
     deltaPoll: null,
+    landRings: null, // [[ [lon,lat], ... ], ...] once loaded; null = not ready yet
   };
+
+  // Coarse (110m) world land outline, fetched once from a CDN and cached for
+  // the page's lifetime -- geographic reference so density cells don't float
+  // on plain black. Same lazy-CDN-script pattern globe.js already uses for
+  // Three.js. Best-effort: if the fetch fails (offline, CDN blocked) the map
+  // still renders fine, just without the outline.
+  let landOutlinePromise = null;
+
+  function loadTopojsonLib() {
+    if (window.topojson) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js";
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("topojson-client load failed"));
+      document.head.appendChild(s);
+    });
+  }
+
+  function ensureLandOutline(cb) {
+    if (state.landRings) {
+      cb();
+      return;
+    }
+    if (!landOutlinePromise) {
+      landOutlinePromise = loadTopojsonLib()
+        .then(() => fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json"))
+        .then((r) => r.json())
+        .then((topo) => {
+          const geo = window.topojson.feature(topo, topo.objects.land);
+          const rings = [];
+          for (const feature of geo.features) {
+            const g = feature.geometry;
+            const polys =
+              g.type === "Polygon"
+                ? [g.coordinates]
+                : g.type === "MultiPolygon"
+                  ? g.coordinates
+                  : [];
+            for (const poly of polys) {
+              for (const ring of poly) rings.push(ring);
+            }
+          }
+          state.landRings = rings;
+        })
+        .catch((e) => {
+          console.warn("[heatmap] land outline unavailable:", e);
+          state.landRings = []; // give up quietly, don't retry every redraw
+        });
+    }
+    landOutlinePromise.then(cb);
+  }
+
+  function drawLandOutline(ctx, cssW, cssH) {
+    const rings = state.landRings;
+    if (!rings || !rings.length) return;
+    ctx.save();
+    ctx.strokeStyle = "rgba(180, 168, 176, 0.4)";
+    ctx.lineWidth = Math.max(0.5, Math.min(1, cssW / 1400));
+    ctx.beginPath();
+    for (const ring of rings) {
+      let prevX = null;
+      for (let i = 0; i < ring.length; i++) {
+        const lon = ring[i][0];
+        const lat = ring[i][1];
+        const x = ((lon + 180) / 360) * cssW;
+        const y = ((90 - lat) / 180) * cssH;
+        // A ring crossing the antimeridian (e.g. Antarctica, Siberia) jumps
+        // from ~+180 to ~-180 between consecutive points; without this guard
+        // that reads as a single stray line drawn straight across the map.
+        if (i === 0 || (prevX !== null && Math.abs(x - prevX) > cssW * 0.5)) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+        prevX = x;
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
 
   function readLoadLimit() {
     const full = $("load-limit-full");
@@ -365,6 +447,7 @@
     ctx.imageSmoothingEnabled = cellPx < 2;
     ctx.fillStyle = "#08060a";
     ctx.fillRect(0, 0, cssW, cssH);
+    drawLandOutline(ctx, cssW, cssH);
 
     const ghosts = (state.ghost && state.ghost.cells) || [];
     const ghostAt = new Map();
@@ -569,6 +652,12 @@
     return j;
   }
 
+  function syncSelectTitle(sel) {
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    sel.title = opt ? opt.textContent : "";
+  }
+
   function fillCountrySelect(countries, current) {
     const sel = $("country-select");
     if (!sel) return;
@@ -589,6 +678,7 @@
       sel.appendChild(opt);
     }
     if (cur) sel.value = cur;
+    syncSelectTitle(sel);
   }
 
   function updateWowBar() {
@@ -1031,19 +1121,23 @@
         const opt = document.createElement("option");
         opt.value = f.id;
         opt.textContent = f.label + (f.note ? ` — ${f.note}` : "");
+        opt.title = opt.textContent;
         sel.appendChild(opt);
       });
       const merge = document.createElement("option");
       merge.value = "starlink,oneweb";
       merge.textContent = "Starlink + OneWeb (merge)";
+      merge.title = merge.textContent;
       sel.appendChild(merge);
       const debris = document.createElement("option");
       debris.value = "debris";
       debris.textContent = "Public debris (5 event clouds)";
+      debris.title = debris.textContent;
       sel.appendChild(debris);
       const all = document.createElement("option");
       all.value = "all";
       all.textContent = "All curated fleets (merge, no active / no debris)";
+      all.title = all.textContent;
       sel.appendChild(all);
       if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
       else if (String(cur).includes(",")) {
@@ -1051,9 +1145,11 @@
         const opt = document.createElement("option");
         opt.value = cur;
         opt.textContent = `Current merge: ${cur}`;
+        opt.title = opt.textContent;
         sel.appendChild(opt);
         sel.value = cur;
       } else sel.value = cur.split(",")[0] || "starlink";
+      syncSelectTitle(sel);
       const lim = state.full?.limit != null ? state.full.limit : state.loadLimit;
       syncLoadLimitUI(lim);
       setText(
@@ -1211,6 +1307,7 @@
     ctx.imageSmoothingEnabled = cellPx < 2;
     ctx.fillStyle = "#08060a";
     ctx.fillRect(0, 0, cssW, cssH);
+    drawLandOutline(ctx, cssW, cssH);
     const maxAbs = Math.max(
       1,
       ...cells.map((c) => Math.abs(Number(c.delta) || 0))
@@ -1739,7 +1836,26 @@
     canvas.addEventListener("mouseleave", () => tip.classList.remove("show"));
   }
 
+  function wireSideTabs() {
+    const btns = [...document.querySelectorAll(".side-tab-btn")];
+    const panels = [...document.querySelectorAll(".side-tab[data-side-tab-panel]")];
+    btns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.sideTab;
+        btns.forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        panels.forEach((p) => {
+          p.hidden = p.dataset.sideTabPanel !== target;
+        });
+      });
+    });
+  }
+
   function wire() {
+    wireSideTabs();
     $("btn-refresh")?.addEventListener("click", () => {
       refreshMap().catch((e) => {
         setText("err", String(e.message || e));
@@ -1896,14 +2012,16 @@
       }
     });
     $("fleet-select")?.addEventListener("change", () => {
-      if (!state.reachView) return;
       const sel = $("fleet-select");
+      syncSelectTitle(sel);
+      if (!state.reachView) return;
       state.fleet = (sel && sel.value) || state.fleet;
       applyFilter().catch((e) => setText("err", String(e.message || e)));
     });
     $("country-select")?.addEventListener("change", () => {
-      if (!state.reachView) return;
       const csel = $("country-select");
+      syncSelectTitle(csel);
+      if (!state.reachView) return;
       state.country = (csel && csel.value) || "";
       applyFilter().catch((e) => setText("err", String(e.message || e)));
     });
@@ -1918,6 +2036,7 @@
       });
     }
     setupTooltip();
+    ensureLandOutline(() => redrawMap());
     listSnapshots().catch(() => {});
     loadFleetList().catch(() => {});
     loadTimeline().catch(() => {});

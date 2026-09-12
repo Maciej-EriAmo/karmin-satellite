@@ -270,6 +270,40 @@ main {
   overscroll-behavior: contain;
 }
 
+.side-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.2rem 0.15rem 0.6rem;
+  border-bottom: 1px solid #221c28;
+  padding-bottom: 0.5rem;
+}
+
+.side-tab-btn {
+  flex: 1 1 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.4rem 0.3rem;
+}
+
+.side-tab-btn:hover {
+  color: var(--ink);
+}
+
+.side-tab-btn.active {
+  color: #ffd0d0;
+  border-color: var(--crimson);
+  background: linear-gradient(180deg, #3a1520, #241018);
+}
+
+.side-tab[hidden] {
+  display: none;
+}
+
 .side-block {
   border-bottom: 1px solid #221c28;
   padding: 0.15rem 0;
