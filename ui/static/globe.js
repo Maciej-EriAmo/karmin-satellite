@@ -58,6 +58,10 @@
     const camera = new THREE.PerspectiveCamera(42, w / h, 0.01, 100);
     // slightly closer so Earth fills the larger frame
     camera.position.set(0, 0.28, 2.15);
+    // Without this the camera looks straight down -Z from y=0.28 instead of
+    // at the sphere's center (0,0,0), which pushed the globe toward the
+    // bottom of the frame and cropped its top edge.
+    camera.lookAt(0, 0, 0);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h, false);
